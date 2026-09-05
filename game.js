@@ -1,0 +1,111 @@
+(function (root) {
+  'use strict';
+  const denominations = [500, 100, 50, 10, 5, 1];
+  const products = [
+    { name: '高級アイスのフタ裏の濃いところ', price: 198, emoji: '🍨', category: '日常の珍品', description: 'いちばんおいしいところ、集めました。', color: '#eee4d6' },
+    { name: 'なぜか1本だけ余る謎のネジ', price: 38, emoji: '🔩', category: '日常の珍品', description: '組み立ては完了。たぶん、きっと。', color: '#e2e9e7' },
+    { name: 'すれ違った犬に2度見された経験', price: 1280, emoji: '🐕', category: 'シュール', description: 'あの日の視線を、あなたにも。', color: '#eee4cf' },
+    { name: '絶対に1回で出ないガチャ', price: 489, emoji: '🎰', category: 'シュール', description: '次こそは、という気持ちが付属します。', color: '#e5e5f0' },
+    { name: '実家で見つかった謎の壺', price: 9800, emoji: '🏺', category: '高額トラップ', description: '鑑定には、まだ出していません。', color: '#eedfda' },
+    { name: '1本丸ごと食べる巨大ちくわ', price: 3980, emoji: '🍢', category: '高額トラップ', description: '穴の向こうに、明日が見える。', color: '#e6e9d6' }
+  ];
+  function changeCoins(amount) {
+    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Invalid change');
+    // Return whole thousands as banknotes; only the remainder enters the coin wallet.
+    amount %= 1000;
+    const coins = {};
+    for (const value of denominations) { coins[value] = Math.floor(amount / value); amount %= value; }
+    return coins;
+  }
+  const count = coins => denominations.reduce((sum, v) => sum + coins[v], 0);
+  const noteDenominations = [10000, 1000];
+  function createGame(config = root.WALLET_CONFIG) {
+    const fail = message => { throw new Error(`wallet-config.js: ${message}`); };
+    if (!config || typeof config !== 'object') fail('財布の設定がありません。');
+    for (const [key, values] of [['coins', denominations], ['notes', noteDenominations]]) {
+      if (!config[key] || typeof config[key] !== 'object') fail(`${key}を指定してください。`);
+      if (Object.keys(config[key]).some(value => !values.includes(Number(value)))) fail(`${key}に未対応の額面があります。`);
+      for (const value of values) {
+        const n = config[key][value];
+        if (key === 'notes' && n === null) continue;
+        if (!Number.isSafeInteger(n) || n < 0) fail(`${key}.${value}は0以上の整数${key === 'notes' ? 'またはnull' : ''}にしてください。`);
+      }
+    }
+    const capacity = config.maxCoinsCapacity;
+    if (!Number.isSafeInteger(capacity) || capacity < 1) fail('maxCoinsCapacityは1以上の整数にしてください。');
+    if (count(config.coins) > capacity) fail('初期硬貨の合計枚数が上限を超えています。');
+    return {wallet:{...config.coins}, notes:{...config.notes}, capacity, tray:[], total:0, purchases:[], over:false};
+  }
+  function changeNotes(amount) {
+    const notes = {};
+    for (const value of noteDenominations) { notes[value] = Math.floor(amount / value); amount %= value; }
+    return notes;
+  }
+  // Unlimited 1,000-yen notes make this the minimum notes-only payment.
+  function riskLevel(price) {
+    const changeCount = count(changeCoins(Math.ceil(price / 1000) * 1000 - price));
+    return Math.max(1, Math.ceil(changeCount / 3));
+  }
+  function riskWeights(purchasedCount) {
+    return purchasedCount < 3 ? [60, 30, 10, 0, 0]
+      : purchasedCount < 10 ? [10, 30, 40, 20, 0] : [5, 15, 30, 35, 15];
+  }
+  function selectRiskLevel(purchasedCount, random = Math.random) {
+    let roll = random() * 100;
+    const weights = riskWeights(purchasedCount);
+    for (let i = 0; i < weights.length; i++) {
+      if (roll < weights[i]) return i + 1;
+      roll -= weights[i];
+    }
+    return 5;
+  }
+  const pricePools = Array.from({length: 5}, () => []);
+  for (let price = 1; price <= 1000; price++) pricePools[riskLevel(price) - 1].push(price);
+  function generateProduct(product, purchasedCount, random = Math.random) {
+    const level = selectRiskLevel(purchasedCount, random);
+    const pool = pricePools[level - 1];
+    // Keep each product in its original thousand-yen price band; never mutate a receipt item.
+    const price = Math.floor(product.price / 1000) * 1000 + pool[Math.floor(random() * pool.length)];
+    return {...product, price, riskLevel: level};
+  }
+  const paid = state => state.tray.reduce((sum, money) => sum + money.value, 0);
+  function add(state, value, note = false) {
+    if (state.over || (note ? ![1000, 10000].includes(value) : !denominations.includes(value))) return false;
+    const holdings = note ? state.notes : state.wallet;
+    if (holdings[value] === 0) return false;
+    if (holdings[value] !== null) holdings[value]--;
+    state.tray.push({value, note}); return true;
+  }
+  function remove(state, index) {
+    if (state.over || index < 0 || index >= state.tray.length) return;
+    const [money] = state.tray.splice(index, 1);
+    const holdings = money.note ? state.notes : state.wallet;
+    if (holdings[money.value] !== null) holdings[money.value]++;
+  }
+  function clear(state) { while (!state.over && state.tray.length) remove(state, state.tray.length - 1); }
+  function previewPayment(state, product) {
+    if (state.over || paid(state) < product.price) return null;
+    const change = paid(state) - product.price;
+    const returned = changeCoins(change);
+    const spentCoins = state.tray.filter(money => !money.note).length;
+    const changeCount = count(returned);
+    const after = count(state.wallet) + changeCount;
+    return {change, returned, returnedNotes: changeNotes(change), banknoteAmount: change - change % 1000, changeCount, delta: changeCount - spentCoins,
+      after, upgraded: after === 0, over: after > state.capacity};
+  }
+  function pay(state, product) {
+    const preview = previewPayment(state, product);
+    if (!preview) return null;
+    const {returned, upgraded, over} = preview;
+    for (const value of denominations) state.wallet[value] += returned[value];
+    for (const value of noteDenominations) {
+      if (state.notes[value] !== null) state.notes[value] += preview.returnedNotes[value];
+    }
+    state.tray = []; state.total += product.price; state.purchases.push(product);
+    if (upgraded) state.capacity += 2;
+    state.over = over;
+    return preview;
+  }
+  root.CoinGame = { denominations, products, changeCoins, count, createGame, paid, add, remove, clear, pay,
+    riskLevel, riskWeights, selectRiskLevel, generateProduct, previewPayment, noteDenominations, changeNotes };
+})(globalThis);

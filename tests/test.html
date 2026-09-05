@@ -1,0 +1,142 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>Game tests</title><body><pre id="results"></pre><script src="../wallet-config.js"></script><script src="../game.js"></script><script>
+const T=CoinGame, out=document.getElementById('results'); let passed=0;
+function test(name,fn){try{fn();out.textContent+='PASS '+name+'\n';passed++;}catch(e){out.textContent+='FAIL '+name+': '+e.message+'\n';}}
+function assert(condition){if(!condition)throw Error('Assertion failed');}
+test('custom configuration is copied and restored on new game',()=>{
+ const config={coins:{500:1,100:0,50:0,10:0,5:0,1:0},notes:{1000:3,10000:0},maxCoinsCapacity:20};
+ const s=T.createGame(config);assert(s.capacity===20&&T.count(s.wallet)===1&&s.notes[1000]===3);
+ T.add(s,500);T.add(s,1000,true);assert(config.coins[500]===1&&config.notes[1000]===3);assert(T.createGame(config).notes[1000]===3);
+});
+test('finite notes cannot be overspent and return exactly once',()=>{
+ const config={...WALLET_CONFIG,notes:{1000:1,10000:0}};const s=T.createGame(config);
+ assert(T.add(s,1000,true));assert(!T.add(s,1000,true));assert(!T.add(s,10000,true));T.remove(s,0);assert(s.notes[1000]===1);T.add(s,1000,true);T.clear(s);assert(s.notes[1000]===1);
+});
+test('banknote change credits finite holdings and preserves unlimited notes',()=>{
+ const s=T.createGame({...WALLET_CONFIG,notes:{1000:0,10000:1}});T.add(s,10000,true);T.add(s,50);T.pay(s,{price:9030});assert(s.notes[1000]===1&&s.notes[10000]===0);
+ const unlimited=T.createGame();T.add(unlimited,10000,true);T.pay(unlimited,{price:9030});assert(unlimited.notes[1000]===null&&unlimited.notes[10000]===null);
+});
+test('invalid settings are rejected',()=>{
+ for(const config of [{...WALLET_CONFIG,maxCoinsCapacity:0},{...WALLET_CONFIG,maxCoinsCapacity:2},{...WALLET_CONFIG,coins:{...WALLET_CONFIG.coins,1:-1}},{...WALLET_CONFIG,notes:{1000:1.5,10000:0}},{...WALLET_CONFIG,notes:{1000:0}}]){
+  let rejected=false;try{T.createGame(config);}catch(e){rejected=e.message.includes('wallet-config.js');}assert(rejected);
+ }
+});
+test('initial wallet has 8 coins, capacity 15',()=>{const s=T.createGame();assert(T.count(s.wallet)===8&&s.capacity===15);});
+test('change is minimal for all amounts through 10000',()=>{const dp=[0];for(let a=1;a<=10000;a++){dp[a]=Math.min(...T.denominations.filter(v=>v<=a).map(v=>dp[a-v]+1));const c=T.changeCoins(a);assert(T.count(c)===dp[a%1000]);assert(T.denominations.reduce((n,v)=>n+v*c[v],0)===a%1000);}});
+test('coins cannot be spent twice; return conserves wallet',()=>{const s=T.createGame();assert(T.add(s,50));assert(!T.add(s,50));T.add(s,1000,true);T.clear(s);assert(T.count(s.wallet)===8&&T.paid(s)===0&&s.wallet[50]===1);});
+test('insufficient payment has no effect',()=>{const s=T.createGame();T.add(s,100);const before=JSON.stringify(s);assert(T.pay(s,T.products[0])===null);assert(JSON.stringify(s)===before);});
+test('payment gives correct coins and score',()=>{const s=T.createGame();T.add(s,100);T.add(s,100);const r=T.pay(s,T.products[0]);assert(r.change===2&&s.wallet[1]===4&&T.count(s.wallet)===8&&s.total===198&&s.purchases.length===1&&!s.over);});
+test('empty wallet adds 2 capacity',()=>{const s=T.createGame();for(const v of T.denominations)while(s.wallet[v])T.add(s,v);const r=T.pay(s,{price:277});assert(r.upgraded&&s.capacity===17&&T.count(s.wallet)===0&&!s.over);});
+test('exact capacity survives',()=>{const s=T.createGame();T.add(s,1000,true);T.pay(s,{price:917});assert(T.count(s.wallet)===15&&!s.over);});
+test('overflow ends game and includes last purchase',()=>{const s=T.createGame();T.add(s,10000,true);const r=T.pay(s,{price:1});assert(r.over&&s.total===1&&s.purchases.length===1);const before=JSON.stringify(s);assert(!T.add(s,1000,true));assert(T.pay(s,T.products[1])===null);assert(JSON.stringify(s)===before);});
+test('exact bill payment with empty wallet upgrades',()=>{const s=T.createGame();s.wallet=T.changeCoins(0);T.add(s,1000,true);assert(T.pay(s,{price:1000}).upgraded);});
+
+test('9030 paid with 10050 returns a note and two coins',()=>{
+ const s=T.createGame();T.add(s,10000,true);T.add(s,50);
+ const preview=T.previewPayment(s,{price:9030});assert(preview.change===1020&&preview.banknoteAmount===1000&&preview.changeCount===2&&preview.delta===1&&preview.after===9);
+ const result=T.pay(s,{price:9030});assert(result.returned[10]===2&&result.returned[500]===0);assert(T.count(s.wallet)===9&&!s.over);
+});
+test('banknote boundaries preserve value and never return over 15 coins',()=>{
+ for(const amount of [0,999,1000,1001,1020,9999,10000,10020,20999]){
+  const s=T.createGame();T.add(s,10000,true);T.add(s,10000,true);T.add(s,10000,true);
+  const r=T.previewPayment(s,{price:30000-amount});assert(r.changeCount<=15);assert(r.banknoteAmount+T.denominations.reduce((n,v)=>n+v*r.returned[v],0)===amount);
+ }
+ const s=T.createGame();s.wallet=T.changeCoins(0);T.add(s,10000,true);const r=T.pay(s,{price:9000});assert(r.changeCount===0&&r.banknoteAmount===1000&&r.upgraded&&s.capacity===17);
+});
+test('risk definition includes exact notes and corrected examples',()=>{assert(T.riskLevel(1000)===1);assert(T.riskLevel(999)===1);assert(T.riskLevel(1)===5);assert(T.riskLevel(1500)===1);});
+test('all progression boundaries have exact probability weights',()=>{
+ for(const [n,expected] of [[0,[60,30,10,0,0]],[2,[60,30,10,0,0]],[3,[10,30,40,20,0]],[9,[10,30,40,20,0]],[10,[5,15,30,35,15]],[100,[5,15,30,35,15]]]){
+  const actual=[0,0,0,0,0];for(let i=0;i<100;i++)actual[T.selectRiskLevel(n,()=>i/100)-1]++;
+  assert(JSON.stringify(actual)===JSON.stringify(expected));
+ }
+});
+test('generated prices always match selected risk and preserve templates',()=>{
+ const before=JSON.stringify(T.products);
+ for(const n of [0,2,3,9,10,100])for(const product of T.products)for(const roll of [.01,.06,.15,.35,.65,.9,.999])for(let i=0;i<1000;i++){
+  let calls=0;const generated=T.generateProduct(product,n,()=>calls++===0?roll:i/1000);
+  assert(generated.riskLevel===T.selectRiskLevel(n,()=>roll));assert(T.riskLevel(generated.price)===generated.riskLevel);
+  assert(generated.price>0&&Number.isInteger(generated.price));assert(generated!==product);
+ }
+ assert(JSON.stringify(T.products)===before);
+});
+test('preview matches actual payment, without mutation, across all prices',()=>{
+ for(let price=1;price<=1000;price++){
+  const s=T.createGame();T.add(s,1);T.add(s,1);T.add(s,1000,true);const before=JSON.stringify(s);
+  const preview=T.previewPayment(s,{price});assert(JSON.stringify(s)===before);
+  T.pay(s,{price});assert(T.count(s.wallet)-8===preview.delta);assert(T.count(s.wallet)===preview.after);assert(s.over===preview.over);
+ }
+});
+test('preview handles negative, zero, positive, incomplete and returned payments',()=>{
+ const s=T.createGame();assert(T.previewPayment(s,{price:200})===null);
+ T.add(s,100);T.add(s,100);assert(T.previewPayment(s,{price:200}).delta===-2);assert(T.previewPayment(s,{price:198}).delta===0);
+ T.clear(s);assert(T.previewPayment(s,{price:198})===null);T.add(s,1000,true);assert(T.previewPayment(s,{price:111}).delta===13);assert(T.previewPayment(s,{price:111}).over);
+ T.remove(s,0);assert(T.previewPayment(s,{price:111})===null);
+});
+test('15-coin change fits empty wallet and successive bonuses reach 19',()=>{
+ const s=T.createGame();s.wallet=T.changeCoins(0);T.add(s,1000,true);T.pay(s,{price:1});assert(T.count(s.wallet)===15&&!s.over);
+ const empty=T.createGame();empty.wallet=T.changeCoins(0);
+ for(const capacity of [17,19]){T.add(empty,1000,true);T.pay(empty,{price:1000});assert(empty.capacity===capacity);}
+});
+</script><div hidden>
+
+<main class="game">
+<header><a class="brand" href="./">◉ 小銭商店<span>THE SMALL CHANGE SHOP</span></a><div class="header-actions"><button id="sound" aria-label="効果音をオンにする" aria-pressed="false">♪ OFF</button><button id="help" aria-label="遊び方">?</button></div></header>
+<section class="collection" aria-label="購入した商品"><div class="score"><span>お買いもの総額</span><strong id="total">¥0</strong><small><span id="purchases">0</span> 点のお買いもの <span class="best">BEST <b id="best">¥0</b></span></small></div><div id="trophies" aria-hidden="true"></div><span class="shelf-label">ちょっと変な、いい買いもの。</span></section>
+<section class="product"><div class="product-top"><span class="tag">本日の掘り出しもの</span><span id="item-number">NO. 001</span></div><div class="product-art" id="art" aria-hidden="true"></div><span id="category" class="category"></span><h1 id="item-name"></h1><p id="description"></p><div class="price" id="price"></div></section>
+<section class="payment" aria-label="支払いトレイ"><div class="section-heading"><h2>お支払いトレイ</h2><button id="clear">↶ 全返却</button></div><div class="tray"><div id="tray-items"><span class="tray-hint">お金をタップして、ここに。</span></div><div class="tray-bottom"><span><span id="tray-label">投入額</span> <strong id="paid">¥0</strong></span><small id="tray-instruction">タップで1枚返却</small></div></div><div class="checkout"><div class="payment-feedback" aria-live="polite" aria-atomic="true"><span id="payment-hint">お金を選んでください</span><strong id="coin-preview"></strong></div><button id="pay" disabled>お会計 <span>✓</span></button></div></section>
+<section class="wallet" id="wallet"><div class="section-heading"><h2><span aria-hidden="true">▱</span> あなたのお財布</h2><strong id="capacity">008<span>/015</span></strong></div><div class="capacity-track"><div id="capacity-bar"></div></div><div id="coins" class="coins"></div><div class="notes"><button data-note="1000"><span class="note-seal">壱</span><span>¥1,000<small>千円札</small></span><b>∞</b></button><button data-note="10000"><span class="note-seal">万</span><span>¥10,000<small>一万円札</small></span><b>∞</b></button></div><p class="wallet-tip">小銭をタップ / 上にスワイプでトレイへ</p></section>
+<footer>小銭ゼロで、お財布の容量 ＋2。<span>買いすぎ注意。小銭はもっと注意。</span></footer>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="help-dialog"><button class="close" data-close="help-dialog" aria-label="閉じる">×</button><span class="dialog-icon">◉</span><h2>小銭じょうずは、買いものじょうず。</h2><p>お財布のお金をじょうずに使って、ちょっと変な商品を買い続けよう。</p><ol><li>小銭やお札をタップしてトレイへ。</li><li>商品の金額以上を用意して「お会計」。</li><li>お釣りは千円単位をお札で、端数を最少枚数の硬貨で返します。</li></ol><p>お財布が<strong>0枚なら容量＋2</strong>。<br>上限を超えたらゲームオーバー！</p><small>ヒント：198円に203円を出すと、お釣りは5円玉1枚。</small><button class="primary" data-close="help-dialog">お買いものをはじめる →</button></dialog>
+<dialog id="result"><div class="receipt"><span>小銭商店 / RECEIPT</span><h2>財布がパンクしました</h2><p>お買い上げ、ありがとうございました。</p><div id="receipt-items"></div><div class="receipt-total">合計 <strong id="result-total"></strong></div><p id="result-count"></p><p id="result-capacity"></p><div class="barcode" aria-hidden="true"></div><small>またのご来店を、お待ちしています。</small><button id="restart" class="primary">もう一度お買いもの →</button></div></dialog>
+</div><script src="../app.js"></script><script>
+test('initial product follows opening risk table',()=>{assert(current.riskLevel<=3);assert(G.riskLevel(current.price)===current.riskLevel);assert(state.capacity===15);});
+test('UI preview updates on insertion, individual return and clear',()=>{
+ current={...G.products[0],price:200};renderProduct();render();
+ document.querySelector('.coin-slot[data-value="100"]').click();assert(!$('coin-preview').textContent);assert($('pay').disabled);
+ document.querySelector('.coin-slot[data-value="100"]').click();assert($('coin-preview').textContent.includes('-2枚'));assert($('coin-preview').textContent.includes('6/15'));
+ assert($('tray-items').querySelectorAll('.tray-money').length===2);
+ document.querySelector('.tray-money').click();assert($('tray-items').querySelectorAll('.tray-money').length===1);assert(!$('coin-preview').textContent);
+ $('clear').click();assert(!$('coin-preview').textContent);assert(G.count(state.wallet)===8);
+});
+test('UI shows two change coins and a net gain of one for 9030',()=>{
+ current={...G.products[0],price:9030};renderProduct();render();
+ document.querySelector('[data-note="10000"]').click();document.querySelector('.coin-slot[data-value="50"]').click();
+ assert($('payment-hint').textContent.includes('硬貨 2枚'));assert($('payment-hint').textContent.includes('お札 ¥1,000'));assert($('coin-preview').textContent.includes('+1枚'));assert($('coin-preview').textContent.includes('9/15'));
+ $('clear').click();
+});
+test('UI payment, receipt and restart preserve generated price and reset capacity',()=>{
+ current={...G.products[0],price:198};renderProduct();render();
+ document.querySelector('.coin-slot[data-value="100"]').click();document.querySelector('.coin-slot[data-value="100"]').click();
+ assert($('coin-preview').textContent.includes('0枚'));$('pay').click();assert($('total').textContent==='¥198');assert($('pay').disabled);assert(!$('coin-preview').textContent);
+ showResult();assert($('result').open);assert($('receipt-items').textContent.includes('¥198'));$('restart').click();assert($('total').textContent==='¥0');assert(!$('result').open);assert(state.capacity===15&&current.riskLevel<=3);
+});
+async function testAsync(name, fn) {try {await fn(); out.textContent+='PASS '+name+'\n'; passed++;} catch(e) {out.textContent+='FAIL '+name+': '+e.message+'\n';}}
+(async () => {
+ await testAsync('change appears as three pieces before wallet updates and controls stay locked', async()=>{
+  $('restart').click();current={...G.products[0],price:9030};renderProduct();render();add(10000,true);add(50);
+  const pending=$('pay').onclick();
+  assert($('tray-label').textContent==='お釣り');assert($('tray-items').querySelectorAll('[data-kind="coin"]').length===2);assert($('tray-items').querySelectorAll('[data-kind="note"]').length===1);
+  assert($('capacity').textContent==='007/015');assert($('clear').disabled&&$('pay').disabled);
+  const total=state.total;add(1000,true);await $('pay').onclick();assert(state.total===total&&state.tray.length===0);
+  await pending;assert(!busy);assert($('capacity').textContent==='009/015');assert(!document.querySelector('.money-flight'));assert($('tray-label').textContent==='投入額');
+ });
+ await testAsync('finite note UI changes only after receipt animation',async()=>{
+  $('restart').click();state=G.createGame({...WALLET_CONFIG,notes:{1000:0,10000:1}});current={...G.products[0],price:9030};render();
+  const thousand=document.querySelector('[data-note="1000"]');assert(thousand.disabled&&thousand.querySelector('b').textContent==='×0');add(10000,true);add(50);
+  const pending=$('pay').onclick();assert(thousand.querySelector('b').textContent==='×0');await pending;assert(thousand.querySelector('b').textContent==='×1'&&!thousand.disabled);
+ });
+ await testAsync('exact payment finishes without change pieces and upgrades',async()=>{
+  $('restart').click();current={...G.products[0],price:277};for(const v of G.denominations)while(state.wallet[v])G.add(state,v);render();
+  const pending=$('pay').onclick();assert(!$('tray-items').querySelector('.tray-money'));await pending;assert(!busy&&state.capacity===17&&state.purchases.length===1);
+ });
+ await testAsync('overflow receipt opens only after change is collected',async()=>{
+  $('restart').click();current={...G.products[0],price:1};add(1000,true);
+  const pending=$('pay').onclick();assert(!$('result').open);assert($('tray-items').querySelectorAll('.tray-money').length===15);await pending;assert($('result').open&&state.over);assert(!document.querySelector('.money-flight'));
+ });
+ await testAsync('restart cancels pending change without advancing new game',async()=>{
+  $('restart').click();current={...G.products[0],price:9030};add(10000,true);add(50);const pending=$('pay').onclick();$('restart').click();const product=current;await pending;assert(current===product&&state.purchases.length===0&&!busy);assert(!document.querySelector('.money-flight'));
+ });
+ out.textContent+='\n'+passed+'/30 tests passed';document.title=passed===30?'PASS':'FAIL';
+})();
+</script></body></html>
