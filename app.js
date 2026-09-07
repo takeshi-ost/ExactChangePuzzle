@@ -25,8 +25,12 @@ productContent.append(...productPanel.childNodes);
 productPanel.append(productContent);
 const growth = document.createElement('div');
 growth.className = 'growth';
-growth.innerHTML = '<div class="growth-label"><strong id="exp-count"></strong><small id="wear-countdown"></small></div><progress id="exp-gauge" aria-label="次の上限拡張までのポイント" max="10" value="0"></progress>';
-$('wallet').querySelector('.capacity-track').after(growth);
+growth.innerHTML = '<div id="exp-indicator" role="progressbar" aria-label="次の上限拡張までのポイント" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0">' + '<span aria-hidden="true"></span>'.repeat(5) + '</div>';
+$('wallet').querySelector('.coin-total-label').after(growth);
+function renderPoints(points) {
+  $('exp-indicator').setAttribute('aria-valuenow', String(points));
+  [...$('exp-indicator').children].forEach((segment, i) => segment.classList.toggle('filled', i < points));
+}
 const expPreview = document.createElement('span');
 expPreview.id = 'exp-preview';
 $('coin-preview').after(expPreview);
@@ -60,22 +64,28 @@ async function slideProduct(entering) {
   try { await Promise.race([animation.finished, pause(duration + 100)]); }
   catch {} finally { if (productAnimation === animation) { animation.cancel(); productAnimation = null; } }
 }
-async function showPoints(points, exact = false) {
+async function showPoints(points, exact = false, paymentState = state) {
   if (!exact && points <= 0) return;
   const el = document.createElement('div'); el.className = 'point-popup';
   el.textContent = exact ? 'ぴったり！' : `${points}枚へった！`; el.setAttribute('role', 'status');
   document.querySelector('.payment').append(el);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const from = el.getBoundingClientRect(), target = $('exp-indicator').getBoundingClientRect();
+  const dx = target.left + target.width / 2 - from.left - from.width / 2;
+  const dy = target.top + target.height / 2 - from.top - from.height / 2;
   const duration = reduced ? 900 : 1150;
   const animation = el.animate(reduced ? [{opacity:1}, {opacity:1,offset:.8}, {opacity:0}] : [
     {opacity:0, transform:'translate(-50%, 12px) scale(.65)'},
     {opacity:1, transform:'translate(-50%, -4px) scale(1.12)', offset:.2},
     {opacity:1, transform:'translate(-50%, -12px) scale(1)', offset:.7},
-    {opacity:0, transform:'translate(-50%, -32px) scale(1)'}
+    {opacity:0, transform:exact ? 'translate(-50%, -32px) scale(1)' : `translate(calc(-50% + ${dx}px), ${dy}px) scale(.05)`}
   ], {duration, easing:'ease-out', fill:'both'});
   const entry = {el, animation}; pointPopups.add(entry);
   try { await Promise.race([animation.finished, pause(duration + 100)]); }
   catch {} finally { animation.cancel(); el.remove(); pointPopups.delete(entry); }
+  if (!exact && state === paymentState && walletDisplay) {
+    renderPoints(Math.min(5, walletDisplay.currentEXP + points));
+  }
 }
 function renderProduct() {
   $('art').textContent = current.emoji; $('art').style.background = current.color;
@@ -87,18 +97,13 @@ function render() {
   const visibleWallet = walletDisplay?.wallet || state.wallet;
   const visibleCapacity = walletDisplay?.capacity ?? state.capacity;
   const visibleGrowth = walletDisplay || state;
-  $('exp-count').textContent = `${visibleGrowth.currentEXP}/${visibleGrowth.nextLevelEXP} PT`;
-  $('exp-gauge').max = visibleGrowth.nextLevelEXP;
-  $('exp-gauge').value = visibleGrowth.currentEXP;
-  $('wear-countdown').textContent = `摩耗まで ${visibleGrowth.rules.wearInterval - visibleGrowth.wearTurns % visibleGrowth.rules.wearInterval}ターン`;
+  renderPoints(visibleGrowth.currentEXP);
   const rules = state.rules;
-  $('growth-rules').textContent = `お釣りがある会計では、小銭を減らした枚数がポイントに。毎回${rules.initialLevelEXP}PTで小銭上限＋${rules.levelCapacityBonus}枚。お釣り0円なら小銭上限＋${rules.exactCapacityBonus}枚だけを適用し、ポイント・摩耗カウントは進みません。お釣りがある会計${rules.wearInterval}回ごとに小銭上限−1枚（摩耗は10枚まで）。上限を超えたらゲームオーバー！`;
+  $('growth-rules').textContent = `小銭を減らした枚数がポイントに。5PTで小銭上限＋${rules.levelCapacityBonus}枚。お釣り0円なら小銭上限＋${rules.exactCapacityBonus}枚。5PTの報酬獲得時に保有PTを0にリセットします。ピッタリ支払いでは保有PTを保持します。上限が増えなかった会計は小銭上限−1枚。上限が0以下になるか、小銭の枚数が上限を超えたらゲームオーバー！`;
   const count = G.count(visibleWallet), paid = G.paid(state);
   $('total').textContent = yen(state.total); $('purchases').textContent = state.purchases.length; $('best').textContent = yen(best);
   $('capacity').textContent = `${visibleCapacity}枚`;
   $('coin-total').textContent = `${count}枚`;
-  $('capacity-bar').style.width = `${Math.min(100, count / visibleCapacity * 100)}%`;
-  $('capacity-bar').style.background = count >= visibleCapacity - 2 ? '#c17d54' : '#82966a';
   $('coins').replaceChildren(...G.denominations.map(value => {
     const n = visibleWallet[value], button = document.createElement('button');
     button.className = 'coin-slot'; button.dataset.value = value; button.disabled = busy || state.over || !n;
@@ -139,7 +144,7 @@ function render() {
   else if (paid < current.price) $('payment-hint').textContent = paid ? `あと ${yen(current.price - paid)}` : '';
   else {
     const { returned } = preview;
-    $('payment-hint').textContent = `お釣り ${yen(paid - current.price)} · 硬貨 ${G.count(returned)}枚${preview.banknoteAmount ? ` ＋ お札 ${yen(preview.banknoteAmount)}` : ''}${preview.over ? '\n⚠ お財布の容量を超えます' : ''}`;
+    $('payment-hint').textContent = `お釣り ${yen(paid - current.price)} · 硬貨 ${G.count(returned)}枚${preview.banknoteAmount ? ` ＋ お札 ${yen(preview.banknoteAmount)}` : ''}${preview.over ? (preview.capacityAfter <= 0 ? '\n⚠ 小銭上限が0になりゲームオーバー' : '\n⚠ お財布の容量を超えます') : ''}`;
   }
   document.querySelectorAll('[data-note]').forEach(b => {
     const n = (walletDisplay?.notes || state.notes)[b.dataset.note];
@@ -234,11 +239,11 @@ async function animateChange(result, paymentState) {
   layoutTray();
   if (!pieces.length) $('tray-items').innerHTML = '<span class="tray-hint">お釣りなし ✨</span>';
   $('payment-hint').textContent = money.length ? 'お釣りをお返しします' : 'ピッタリ！';
-  void showPoints(result.earnedEXP, result.change === 0);
+  const pointsAnimation = showPoints(result.earnedEXP, result.change === 0, paymentState);
   await pause(money.length ? 650 : 350);
   if (state !== paymentState) return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  await Promise.all(pieces.map(async (piece, i) => {
+  await Promise.all([pointsAnimation, ...pieces.map(async (piece, i) => {
     const m = money[i];
     const target = document.querySelector(m.note ? `[data-note="${m.value}"]` : `.coin-slot[data-value="${m.value}"]`);
     const from = piece.getBoundingClientRect(), to = target.getBoundingClientRect();
@@ -259,7 +264,7 @@ async function animateChange(result, paymentState) {
     // Background tabs can suspend animation frames; never leave checkout locked.
     try { await Promise.race([animation.finished, pause(duration + delay + 100)]); }
     catch {} finally { animation.cancel(); flight.remove(); moneyFlights.delete(entry); }
-  }));
+  })]);
 }
 $('pay').onclick = async () => {
   if (busy) return;
@@ -270,7 +275,17 @@ $('pay').onclick = async () => {
   trophy(current); se('win'); render();
   await Promise.all([slideProduct(false), animateChange(result, paymentState)]);
   if (state !== paymentState) return;
+  if (result.earnedEXP > 0) {
+    renderPoints(Math.min(5, before.currentEXP + result.earnedEXP));
+    await pause(220);
+    if (state !== paymentState) return;
+  }
   walletDisplay = null; render();
+  if (state.capacity > before.capacity) {
+    $('capacity').classList.remove('capacity-up');
+    void $('capacity').offsetWidth;
+    $('capacity').classList.add('capacity-up');
+  }
   if (result.changeCount) se('coin', result.changeCount);
   else if (result.banknoteAmount) se('note');
   const rewards = [result.earnedEXP ? `+${result.earnedEXP} PT獲得` : '', result.levelUps ? `小銭上限＋${result.levelCapacityGain}枚` : '', result.exactBonus ? `ぴったり！ 小銭上限＋${result.exactBonus}枚` : '', result.wear ? '財布の摩耗：小銭上限−1枚' : ''].filter(Boolean);
@@ -291,5 +306,5 @@ $('sound').onclick = () => { sound = !sound; $('sound').textContent = sound ? '�
 $('help').onclick = () => $('help-dialog').showModal();
 document.querySelectorAll('[data-close]').forEach(button => button.onclick = () => $(button.dataset.close).close());
 $('result').addEventListener('cancel', e => e.preventDefault());
-$('restart').onclick = () => { $('result').close(); productAnimation?.cancel(); for (const entry of pointPopups) { entry.animation.cancel(); entry.el.remove(); } pointPopups.clear(); for (const entry of moneyFlights) { entry.animation.cancel(); entry.flight.remove(); } moneyFlights.clear(); clearTimeout(toastTimer); $('toast').classList.remove('show'); walletDisplay = null; state = G.createGame(); current = G.generateProduct(G.products[0], 0); bag = []; busy = false; $('trophies').replaceChildren(); $('wallet').classList.remove('burst', 'upgrade', 'wear'); renderProduct(); render(); };
+$('restart').onclick = () => { $('result').close(); $('capacity').classList.remove('capacity-up'); productAnimation?.cancel(); for (const entry of pointPopups) { entry.animation.cancel(); entry.el.remove(); } pointPopups.clear(); for (const entry of moneyFlights) { entry.animation.cancel(); entry.flight.remove(); } moneyFlights.clear(); clearTimeout(toastTimer); $('toast').classList.remove('show'); walletDisplay = null; state = G.createGame(); current = G.generateProduct(G.products[0], 0); bag = []; busy = false; $('trophies').replaceChildren(); $('wallet').classList.remove('burst', 'upgrade', 'wear'); renderProduct(); render(); };
 renderProduct(); render();

@@ -1,5 +1,6 @@
 (function (root) {
   'use strict';
+  const LEVEL_EXP = 5;
   const denominations = [500, 100, 50, 10, 5, 1];
   const products = [
     { name: '高級アイスのフタ裏の濃いところ', price: 198, emoji: '🍨', category: '日常の珍品', description: 'いちばんおいしいところ、集めました。', color: '#eee4d6' },
@@ -35,12 +36,12 @@
     if (!Number.isSafeInteger(capacity) || capacity < 1) fail('maxCoinsCapacityは1以上の整数にしてください。');
     if (count(config.coins) > capacity) fail('初期硬貨の合計枚数が上限を超えています。');
     const rules = {};
-    for (const [key, minimum] of Object.entries({wearInterval:1, initialLevelEXP:1, levelCapacityBonus:0, exactCapacityBonus:0})) {
+    for (const [key, minimum] of Object.entries({levelCapacityBonus:0, exactCapacityBonus:0})) {
       if (!Number.isSafeInteger(config[key]) || config[key] < minimum) fail(`${key}は${minimum}以上の整数にしてください。`);
       rules[key] = config[key];
     }
     return {wallet:{...config.coins}, notes:{...config.notes}, capacity, tray:[], total:0, purchases:[], over:false,
-      level:1, currentEXP:0, nextLevelEXP:rules.initialLevelEXP, wearTurns:0, rules};
+      level:1, currentEXP:0, nextLevelEXP:LEVEL_EXP, wearTurns:0, rules};
   }
   function changeNotes(amount) {
     const notes = {};
@@ -100,23 +101,23 @@
     const exact = change === 0;
     const earnedEXP = exact ? 0 : Math.max(0, spentCoins - changeCount);
     let currentEXP = state.currentEXP + earnedEXP;
-    const nextLevelEXP = state.rules.initialLevelEXP;
+    const nextLevelEXP = LEVEL_EXP;
     let level = state.level, levelUps = 0;
-    while (!exact && currentEXP >= nextLevelEXP) {
-      currentEXP -= nextLevelEXP;
+    if (!exact && currentEXP >= nextLevelEXP) {
+      currentEXP = 0;
       level++; levelUps++;
     }
     const exactBonus = exact ? state.rules.exactCapacityBonus : 0;
     const levelCapacityGain = levelUps * state.rules.levelCapacityBonus;
     const turn = state.purchases.length + 1;
-    const wearTurns = state.wearTurns + (exact ? 0 : 1);
+    const wearTurns = state.wearTurns + 1;
     const grownCapacity = state.capacity + levelCapacityGain + exactBonus;
-    // Preserve configured capacities below 10; wear must never increase capacity.
-    const wear = !exact && wearTurns % state.rules.wearInterval === 0 && grownCapacity > 10 ? 1 : 0;
+    // Capacity growth protects the wallet from wear for this checkout.
+    const wear = levelCapacityGain > 0 || exactBonus > 0 ? 0 : 1;
     const capacityAfter = grownCapacity - wear;
     return {change, returned, returnedNotes: changeNotes(change), banknoteAmount: change - change % 1000, changeCount, delta: changeCount - spentCoins,
       after, exact, earnedEXP, currentEXP, nextLevelEXP, level, levelUps, levelCapacityGain, exactBonus, wear, wearTurns, turn, capacityAfter,
-      upgraded: levelUps > 0 || exactBonus > 0, over: after > capacityAfter};
+      upgraded: levelUps > 0 || exactBonus > 0, over: capacityAfter <= 0 || after > capacityAfter};
   }
   function pay(state, product) {
     const preview = previewPayment(state, product);

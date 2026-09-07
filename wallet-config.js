@@ -17,9 +17,7 @@ globalThis.WALLET_CONFIG = {
     5000: null,  // 例: 1 にすると五千円札1枚で開始
     10000: null, // 例: 1 にすると一万円札1枚で開始
   },
-  maxCoinsCapacity: 30,
-  wearInterval: 1,       // 財布が摩耗する間隔（ピッタリ以外の会計回数、1以上の整数）
-  initialLevelEXP: 10,   // 毎回のレベルアップに必要な固定PT（1以上の整数）
-  levelCapacityBonus: 2, // レベルアップ1回で増える容量（0以上の整数）
-  exactCapacityBonus: 5, // お釣り0円のピッタリ支払いで増える容量（0以上の整数）
+  maxCoinsCapacity: 20,
+  levelCapacityBonus: 1, // レベルアップ1回で増える容量（0以上の整数）
+  exactCapacityBonus: 2, // お釣り0円のピッタリ支払いで増える容量（0以上の整数）
 };
