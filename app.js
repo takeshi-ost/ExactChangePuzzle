@@ -15,14 +15,28 @@ let state = initialGame(), current = G.generateProduct(G.products[0], 0), busy =
 let bag = [];
 let walletDisplay = null;
 const moneyFlights = new Set();
+const pointPopups = new Set();
+let productAnimation;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+const productPanel = document.querySelector('.product');
+const productContent = document.createElement('div');
+productContent.className = 'product-content';
+productContent.append(...productPanel.childNodes);
+productPanel.append(productContent);
+const growth = document.createElement('div');
+growth.className = 'growth';
+growth.innerHTML = '<div class="growth-label"><strong id="level-exp"></strong><small id="wear-countdown"></small></div><progress id="exp-gauge" aria-label="次のレベルまでのポイント" max="10" value="0"></progress>';
+$('wallet').querySelector('.capacity-track').after(growth);
+const expPreview = document.createElement('span');
+expPreview.id = 'exp-preview';
+$('coin-preview').after(expPreview);
 try { best = Number(localStorage.getItem('kozeni-best')) || 0; } catch {}
 function se(type, weight = 1) {
   if (!sound) return;
   try {
     audio ||= new (window.AudioContext || window.webkitAudioContext)();
     audio.resume();
-    const tones = type === 'win' ? [523, 659, 784] : type === 'burst' ? [170, 90, 50] : type === 'note' ? [180] : [1300, 1900];
+    const tones = type === 'level' ? [659, 784, 1047, 1319] : type === 'wear' ? [220, 165] : type === 'win' ? [523, 659, 784] : type === 'burst' ? [170, 90, 50] : type === 'note' ? [180] : [1300, 1900];
     tones.forEach((frequency, i) => {
       const osc = audio.createOscillator(), gain = audio.createGain(), t = audio.currentTime + i * .065;
       osc.type = type === 'note' || type === 'burst' ? 'triangle' : 'sine';
@@ -32,15 +46,55 @@ function se(type, weight = 1) {
   } catch {}
 }
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').classList.add('show'); toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3000); }
+async function slideProduct(entering) {
+  productAnimation?.cancel();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const duration = reduced ? 120 : entering ? 420 : 320;
+  productContent.style.transform = entering ? 'none' : 'translateX(-115%)';
+  productContent.style.opacity = entering ? '1' : '0';
+  const animation = productContent.animate(reduced ? [{opacity:entering ? 0 : 1}, {opacity:entering ? 1 : 0}] :
+    entering ? [{transform:'translateX(115%)',opacity:0}, {transform:'translateX(0)',opacity:1}] :
+      [{transform:'translateX(0)',opacity:1}, {transform:'translateX(-115%)',opacity:0}],
+    {duration, easing:entering ? 'cubic-bezier(.16,1,.3,1)' : 'ease-in', fill:'both'});
+  productAnimation = animation;
+  try { await Promise.race([animation.finished, pause(duration + 100)]); }
+  catch {} finally { if (productAnimation === animation) { animation.cancel(); productAnimation = null; } }
+}
+async function showPoints(points, exact = false) {
+  if (!exact && points <= 0) return;
+  const el = document.createElement('div'); el.className = 'point-popup';
+  el.textContent = exact ? 'ぴったり！' : `${points}pt！`; el.setAttribute('role', 'status');
+  document.querySelector('.payment').append(el);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const duration = reduced ? 900 : 1150;
+  const animation = el.animate(reduced ? [{opacity:1}, {opacity:1,offset:.8}, {opacity:0}] : [
+    {opacity:0, transform:'translate(-50%, 12px) scale(.65)'},
+    {opacity:1, transform:'translate(-50%, -4px) scale(1.12)', offset:.2},
+    {opacity:1, transform:'translate(-50%, -12px) scale(1)', offset:.7},
+    {opacity:0, transform:'translate(-50%, -32px) scale(1)'}
+  ], {duration, easing:'ease-out', fill:'both'});
+  const entry = {el, animation}; pointPopups.add(entry);
+  try { await Promise.race([animation.finished, pause(duration + 100)]); }
+  catch {} finally { animation.cancel(); el.remove(); pointPopups.delete(entry); }
+}
 function renderProduct() {
   $('art').textContent = current.emoji; $('art').style.background = current.color;
   $('item-name').textContent = current.name; $('category').textContent = current.category;
   $('description').textContent = current.description; $('price').textContent = yen(current.price);
   $('item-number').textContent = `NO. ${String(state.purchases.length + 1).padStart(3, '0')}`;
+  void slideProduct(true);
 }
 function render() {
   const visibleWallet = walletDisplay?.wallet || state.wallet;
   const visibleCapacity = walletDisplay?.capacity ?? state.capacity;
+  const visibleGrowth = walletDisplay || state;
+  $('level-exp').textContent = `LV.${visibleGrowth.level}  ${visibleGrowth.currentEXP}/${visibleGrowth.nextLevelEXP} PT`;
+  $('exp-gauge').max = visibleGrowth.nextLevelEXP;
+  $('exp-gauge').value = visibleGrowth.currentEXP;
+  $('wear-countdown').textContent = `摩耗まで ${visibleGrowth.rules.wearInterval - visibleGrowth.purchases.length % visibleGrowth.rules.wearInterval}ターン`;
+  const rules = state.rules;
+  $('growth-rules').textContent = `小銭を減らした枚数がポイントに。毎回${rules.initialLevelEXP}PTでレベルアップ・容量＋${rules.levelCapacityBonus}枚（必要PTは固定）。お釣り0円なら容量＋${rules.exactCapacityBonus}枚。${rules.wearInterval}回の会計ごとに容量−1枚（摩耗は10枚まで）。上限を超えたらゲームオーバー！`;
+  document.querySelector('.game>footer').textContent = `小銭を減らしてPT獲得。ピッタリで容量＋${rules.exactCapacityBonus}。`;
   const count = G.count(visibleWallet), paid = G.paid(state);
   $('total').textContent = yen(state.total); $('purchases').textContent = state.purchases.length; $('best').textContent = yen(best);
   $('capacity').innerHTML = `${String(count).padStart(3, '0')}<span>/${String(visibleCapacity).padStart(3, '0')}</span>`;
@@ -67,19 +121,26 @@ function render() {
     button.onclick = () => { if (!busy) { G.remove(state, index); render(); } };
     $('tray-items').append(button);
   });
+  layoutTray();
   $('tray-items').classList.remove('returning-change');
   $('tray-label').textContent = '投入額';
   $('tray-instruction').textContent = 'タップで1枚返却';
   $('paid').textContent = yen(paid); $('clear').disabled = busy || state.over || !state.tray.length;
   $('pay').disabled = busy || state.over || paid < current.price;
   const preview = G.previewPayment(state, current);
-  $('coin-preview').textContent = !busy && preview ? `小銭 ${preview.delta > 0 ? '+' : ''}${preview.delta}枚 ${preview.delta < 0 ? '✨' : preview.delta > 0 ? '⚠️' : '→'}（${preview.after}/${state.capacity}枚）` : '';
+  $('coin-preview').textContent = !busy && preview ? `小銭 ${preview.delta > 0 ? '+' : ''}${preview.delta}枚（${preview.after}/${preview.capacityAfter}枚）` : '';
+  const prediction = !busy && preview ? [preview.earnedEXP ? `+${preview.earnedEXP} PT獲得予想` : '', preview.levelUps ? `LV.${preview.level}へ` : '', preview.exactBonus ? `ピッタリ ＋${preview.exactBonus}枚` : '', preview.wear ? '摩耗 −1枚' : ''].filter(Boolean).join(' · ') : '';
+  const changedPrediction = $('exp-preview').textContent !== prediction;
+  $('exp-preview').textContent = prediction;
+  if (changedPrediction && prediction && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    $('exp-preview').animate([{opacity:.35, transform:'translateY(3px)'}, {opacity:1, transform:'translateY(0)'}], {duration:180});
+  }
   $('coin-preview').dataset.tone = preview?.over ? 'danger' : preview?.delta < 0 ? 'good' : 'neutral';
   if (busy) $('payment-hint').textContent = 'お買い上げありがとうございます';
   else if (paid < current.price) $('payment-hint').textContent = paid ? `あと ${yen(current.price - paid)}` : 'お金を選んでください';
   else {
-    const { returned, after } = preview;
-    $('payment-hint').textContent = `お釣り ${yen(paid - current.price)} · 硬貨 ${G.count(returned)}枚${preview.banknoteAmount ? ` ＋ お札 ${yen(preview.banknoteAmount)}` : ''}${after > state.capacity ? '\n⚠ お財布の容量を超えます' : after === 0 ? '\n✦ 小銭ゼロで容量 ＋2！' : ''}`;
+    const { returned } = preview;
+    $('payment-hint').textContent = `お釣り ${yen(paid - current.price)} · 硬貨 ${G.count(returned)}枚${preview.banknoteAmount ? ` ＋ お札 ${yen(preview.banknoteAmount)}` : ''}${preview.over ? '\n⚠ お財布の容量を超えます' : ''}`;
   }
   document.querySelectorAll('[data-note]').forEach(b => {
     const n = (walletDisplay?.notes || state.notes)[b.dataset.note];
@@ -101,7 +162,7 @@ function trophy(product) {
 }
 function showResult() {
   $('result-total').textContent = yen(state.total); $('result-count').textContent = `${state.purchases.length} 点のお買いもの`;
-  $('result-capacity').textContent = `小銭 ${G.count(state.wallet)}枚 / 容量 ${state.capacity}枚`;
+  $('result-capacity').textContent = `小銭 ${G.count(state.wallet)}枚 / 容量 ${state.capacity}枚 · LV.${state.level} ${state.currentEXP}/${state.nextLevelEXP} PT`;
   $('receipt-items').replaceChildren(...state.purchases.map(p => { const row = document.createElement('div'); row.className = 'receipt-row'; const label = document.createElement('span'), price = document.createElement('span'); label.textContent = `${p.emoji} ${p.name}`; price.textContent = yen(p.price); row.append(label, price); return row; }));
   $('result').showModal();
 }
@@ -120,6 +181,35 @@ function makeTrayMoney(money, index) {
   button.style.setProperty('--scatter-y', `${index * 7 % 9 - 4}px`);
   return button;
 }
+function layoutTray() {
+  const tray = $('tray-items'), pieces = [...tray.querySelectorAll('.tray-money')];
+  if (!pieces.length || !tray.clientWidth || !tray.clientHeight) return;
+  // Keep every piece in the tray. Dense piles shrink together instead of scrolling.
+  const width = Math.max(1, tray.clientWidth - 12), height = Math.max(1, tray.clientHeight - 12);
+  const faceWidth = Math.max(...pieces.map(p => p.offsetWidth)), faceHeight = Math.max(...pieces.map(p => p.offsetHeight));
+  const maxWidth = faceWidth + faceHeight * .22, maxHeight = faceHeight + faceWidth * .22;
+  let best = {scale:0, columns:1, rows:1};
+  for (let rows = 1; rows <= pieces.length; rows++) {
+    const columns = Math.ceil(pieces.length / rows);
+    const scale = Math.min(1, width / (maxWidth * (1.12 + (columns - 1) * .38)), height / (maxHeight * (1.12 + (rows - 1) * .35)));
+    if (scale > best.scale) best = {scale, columns, rows};
+  }
+  const {scale, columns, rows} = best;
+  const cellWidth = maxWidth * scale, cellHeight = maxHeight * scale;
+  const stepX = cellWidth * .38, stepY = cellHeight * .35;
+  const left = 6 + (width - cellWidth - (columns - 1) * stepX) / 2;
+  const top = 6 + (height - cellHeight - (rows - 1) * stepY) / 2;
+  // Larger banknotes sit beneath coins while each button retains its own return handler.
+  pieces.sort((a,b) => b.offsetWidth - a.offsetWidth).forEach((piece, i) => {
+    const x = left + (i % columns) * stepX + Math.sin(i * 2.4) * cellWidth * .035;
+    const scatter = rows === 1 ? (height - cellHeight) * .42 : cellHeight * .12;
+    const y = Math.max(6, Math.min(6 + height - cellHeight,
+      top + Math.floor(i / columns) * stepY + Math.sin(i * 1.7) * scatter));
+    Object.assign(piece.style, {left:`${x + cellWidth / 2}px`, top:`${y + cellHeight / 2}px`, zIndex:String(i + 1),
+      transform:`translate(-50%, -50%) scale(${scale}) rotate(${(i * 17 % 23) - 11}deg)`});
+  });
+}
+new ResizeObserver(layoutTray).observe($('tray-items'));
 function changeMoney(result) {
   const money = [];
   for (const value of G.noteDenominations) {
@@ -142,8 +232,10 @@ async function animateChange(result, paymentState) {
     return el;
   });
   $('tray-items').replaceChildren(...pieces);
+  layoutTray();
   if (!pieces.length) $('tray-items').innerHTML = '<span class="tray-hint">お釣りなし ✨</span>';
   $('payment-hint').textContent = money.length ? 'お釣りをお返しします' : 'ピッタリ！';
+  void showPoints(result.earnedEXP, result.change === 0);
   await pause(money.length ? 650 : 350);
   if (state !== paymentState) return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -153,7 +245,7 @@ async function animateChange(result, paymentState) {
     const from = piece.getBoundingClientRect(), to = target.getBoundingClientRect();
     const flight = piece.cloneNode(true);
     flight.classList.add('money-flight'); flight.setAttribute('aria-hidden', 'true');
-    Object.assign(flight.style, {left:`${from.left}px`, top:`${from.top}px`, width:`${from.width}px`, height:`${from.height}px`});
+    Object.assign(flight.style, {left:`${from.left}px`, top:`${from.top}px`, width:`${from.width}px`, minWidth:'0', height:`${from.height}px`, transform:'none', zIndex:'6'});
     document.body.append(flight); piece.style.visibility = 'hidden';
     const dx = to.left + to.width / 2 - from.left - from.width / 2;
     const dy = to.top + to.height / 2 - from.top - from.height / 2;
@@ -172,22 +264,25 @@ async function animateChange(result, paymentState) {
 }
 $('pay').onclick = async () => {
   if (busy) return;
-  const before = {wallet:{...state.wallet}, notes:{...state.notes}, capacity:state.capacity};
+  const before = {...state, wallet:{...state.wallet}, notes:{...state.notes}, purchases:[...state.purchases]};
   const result = G.pay(state, current); if (!result) return; busy = true;
   const paymentState = state; walletDisplay = before;
   if (state.total > best) { best = state.total; try { localStorage.setItem('kozeni-best', String(best)); } catch {} }
   trophy(current); se('win'); render();
-  await animateChange(result, paymentState);
+  await Promise.all([slideProduct(false), animateChange(result, paymentState)]);
   if (state !== paymentState) return;
   walletDisplay = null; render();
   if (result.changeCount) se('coin', result.changeCount);
   else if (result.banknoteAmount) se('note');
-  if (result.upgraded) {
-    $('wallet').classList.add('upgrade'); toast(`小銭ゼロ！ お財布が ${state.capacity}枚にレベルアップ ✦`);
+  const rewards = [result.earnedEXP ? `+${result.earnedEXP} PT獲得` : '', result.levelUps ? `LV.${state.level}！ 容量＋${result.levelCapacityGain}枚` : '', result.exactBonus ? `ピッタリ！ 容量＋${result.exactBonus}枚` : '', result.wear ? '財布の摩耗：容量−1枚' : ''].filter(Boolean);
+  toast(rewards.length ? rewards.join(' / ') : `お釣り ${yen(result.change)} · 硬貨 ${result.changeCount}枚${result.banknoteAmount ? ` ＋ お札 ${yen(result.banknoteAmount)}` : ''}`);
+  if (result.upgraded || result.wear) {
+    $('wallet').classList.add(result.upgraded ? 'upgrade' : 'wear');
+    se(result.upgraded ? 'level' : 'wear');
     await pause(800);
     if (state !== paymentState) return;
-    $('wallet').classList.remove('upgrade');
-  } else toast(`お釣り ${yen(result.change)} · 硬貨 ${result.changeCount}枚${result.banknoteAmount ? ` ＋ お札 ${yen(result.banknoteAmount)}` : ''}`);
+    $('wallet').classList.remove('upgrade', 'wear');
+  }
   if (result.over) { burst(); await pause(850); if (state === paymentState) showResult(); }
   else { busy = false; nextProduct(); render(); }
 };
@@ -197,5 +292,5 @@ $('sound').onclick = () => { sound = !sound; $('sound').textContent = sound ? '�
 $('help').onclick = () => $('help-dialog').showModal();
 document.querySelectorAll('[data-close]').forEach(button => button.onclick = () => $(button.dataset.close).close());
 $('result').addEventListener('cancel', e => e.preventDefault());
-$('restart').onclick = () => { $('result').close(); for (const entry of moneyFlights) { entry.animation.cancel(); entry.flight.remove(); } moneyFlights.clear(); walletDisplay = null; state = G.createGame(); current = G.generateProduct(G.products[0], 0); bag = []; busy = false; $('trophies').replaceChildren(); $('wallet').classList.remove('burst', 'upgrade'); renderProduct(); render(); };
+$('restart').onclick = () => { $('result').close(); productAnimation?.cancel(); for (const entry of pointPopups) { entry.animation.cancel(); entry.el.remove(); } pointPopups.clear(); for (const entry of moneyFlights) { entry.animation.cancel(); entry.flight.remove(); } moneyFlights.clear(); clearTimeout(toastTimer); $('toast').classList.remove('show'); walletDisplay = null; state = G.createGame(); current = G.generateProduct(G.products[0], 0); bag = []; busy = false; $('trophies').replaceChildren(); $('wallet').classList.remove('burst', 'upgrade', 'wear'); renderProduct(); render(); };
 renderProduct(); render();

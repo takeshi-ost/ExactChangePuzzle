@@ -34,7 +34,13 @@
     const capacity = config.maxCoinsCapacity;
     if (!Number.isSafeInteger(capacity) || capacity < 1) fail('maxCoinsCapacityは1以上の整数にしてください。');
     if (count(config.coins) > capacity) fail('初期硬貨の合計枚数が上限を超えています。');
-    return {wallet:{...config.coins}, notes:{...config.notes}, capacity, tray:[], total:0, purchases:[], over:false};
+    const rules = {};
+    for (const [key, minimum] of Object.entries({wearInterval:1, initialLevelEXP:1, levelCapacityBonus:0, exactCapacityBonus:0})) {
+      if (!Number.isSafeInteger(config[key]) || config[key] < minimum) fail(`${key}は${minimum}以上の整数にしてください。`);
+      rules[key] = config[key];
+    }
+    return {wallet:{...config.coins}, notes:{...config.notes}, capacity, tray:[], total:0, purchases:[], over:false,
+      level:1, currentEXP:0, nextLevelEXP:rules.initialLevelEXP, rules};
   }
   function changeNotes(amount) {
     const notes = {};
@@ -90,19 +96,37 @@
     const spentCoins = state.tray.filter(money => !money.note).length;
     const changeCount = count(returned);
     const after = count(state.wallet) + changeCount;
+    // Coins in the tray still belong to the pre-payment wallet.
+    const earnedEXP = Math.max(0, spentCoins - changeCount);
+    let currentEXP = state.currentEXP + earnedEXP;
+    const nextLevelEXP = state.rules.initialLevelEXP;
+    let level = state.level, levelUps = 0;
+    while (currentEXP >= nextLevelEXP) {
+      currentEXP -= nextLevelEXP;
+      level++; levelUps++;
+    }
+    const exactBonus = change === 0 ? state.rules.exactCapacityBonus : 0;
+    const levelCapacityGain = levelUps * state.rules.levelCapacityBonus;
+    const turn = state.purchases.length + 1;
+    const grownCapacity = state.capacity + levelCapacityGain + exactBonus;
+    // Preserve configured capacities below 10; wear must never increase capacity.
+    const wear = turn % state.rules.wearInterval === 0 && grownCapacity > 10 ? 1 : 0;
+    const capacityAfter = grownCapacity - wear;
     return {change, returned, returnedNotes: changeNotes(change), banknoteAmount: change - change % 1000, changeCount, delta: changeCount - spentCoins,
-      after, upgraded: after === 0, over: after > state.capacity};
+      after, earnedEXP, currentEXP, nextLevelEXP, level, levelUps, levelCapacityGain, exactBonus, wear, turn, capacityAfter,
+      upgraded: levelUps > 0 || exactBonus > 0, over: after > capacityAfter};
   }
   function pay(state, product) {
     const preview = previewPayment(state, product);
     if (!preview) return null;
-    const {returned, upgraded, over} = preview;
+    const {returned, over} = preview;
     for (const value of denominations) state.wallet[value] += returned[value];
     for (const value of noteDenominations) {
       if (state.notes[value] !== null) state.notes[value] += preview.returnedNotes[value];
     }
     state.tray = []; state.total += product.price; state.purchases.push(product);
-    if (upgraded) state.capacity += 2;
+    state.capacity = preview.capacityAfter;
+    state.currentEXP = preview.currentEXP; state.nextLevelEXP = preview.nextLevelEXP; state.level = preview.level;
     state.over = over;
     return preview;
   }

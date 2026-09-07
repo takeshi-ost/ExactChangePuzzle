@@ -2,7 +2,7 @@
 // coins: 各硬貨の枚数（0以上の整数）
 // notes: 各紙幣の枚数（0以上の整数）。null は無制限です。
 // maxCoinsCapacity: 硬貨数の上限（1以上の整数、初期硬貨の合計枚数以上）
-// 紙幣は硬貨数の上限には含みません。完済時の拡張は従来どおり +2枚です。
+// 紙幣は硬貨数の上限には含みません。成長・摩耗のルールは下記の項目で調整します。
 globalThis.WALLET_CONFIG = {
   coins: {
     500: 0,
@@ -16,5 +16,9 @@ globalThis.WALLET_CONFIG = {
     1000: null,  // 例: 5 にすると千円札5枚で開始
     10000: null, // 例: 1 にすると一万円札1枚で開始
   },
-  maxCoinsCapacity: 12,
+  maxCoinsCapacity: 20,
+  wearInterval: 2,       // 財布が摩耗する間隔（会計回数、1以上の整数）
+  initialLevelEXP: 10,   // 毎回のレベルアップに必要な固定PT（1以上の整数）
+  levelCapacityBonus: 1, // レベルアップ1回で増える容量（0以上の整数）
+  exactCapacityBonus: 1, // お釣り0円のピッタリ支払いで増える容量（0以上の整数）
 };
