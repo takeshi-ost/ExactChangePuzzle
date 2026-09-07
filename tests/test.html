@@ -1,23 +1,23 @@
 <!doctype html><html lang="ja"><meta charset="utf-8"><title>Game tests</title><body><pre id="results"></pre><script src="../wallet-config.js"></script><script src="../game.js"></script><script>
-const configuredWallet = WALLET_CONFIG; globalThis.WALLET_CONFIG = {coins:{500:0,100:2,50:1,10:2,5:1,1:2},notes:{1000:null,10000:null},maxCoinsCapacity:15,wearInterval:5,initialLevelEXP:10,levelCapacityBonus:1,exactCapacityBonus:2};
+const configuredWallet = WALLET_CONFIG; globalThis.WALLET_CONFIG = {coins:{500:0,100:2,50:1,10:2,5:1,1:2},notes:{5000:null,1000:null,10000:null},maxCoinsCapacity:15,wearInterval:5,initialLevelEXP:10,levelCapacityBonus:1,exactCapacityBonus:2};
 const T=CoinGame, out=document.getElementById('results'); let passed=0, totalTests=0;
 function test(name,fn){totalTests++;try{fn();out.textContent+='PASS '+name+'\n';passed++;}catch(e){out.textContent+='FAIL '+name+': '+e.message+'\n';}}
 function assert(condition){if(!condition)throw Error('Assertion failed');}
 test('custom configuration is copied and restored on new game',()=>{
- const config={...WALLET_CONFIG,coins:{500:1,100:0,50:0,10:0,5:0,1:0},notes:{1000:3,10000:0},maxCoinsCapacity:20};
+ const config={...WALLET_CONFIG,coins:{500:1,100:0,50:0,10:0,5:0,1:0},notes:{5000:null,1000:3,10000:0},maxCoinsCapacity:20};
  const s=T.createGame(config);assert(s.capacity===20&&T.count(s.wallet)===1&&s.notes[1000]===3);
  T.add(s,500);T.add(s,1000,true);assert(config.coins[500]===1&&config.notes[1000]===3);assert(T.createGame(config).notes[1000]===3);
 });
 test('finite notes cannot be overspent and return exactly once',()=>{
- const config={...WALLET_CONFIG,notes:{1000:1,10000:0}};const s=T.createGame(config);
+ const config={...WALLET_CONFIG,notes:{5000:null,1000:1,10000:0}};const s=T.createGame(config);
  assert(T.add(s,1000,true));assert(!T.add(s,1000,true));assert(!T.add(s,10000,true));T.remove(s,0);assert(s.notes[1000]===1);T.add(s,1000,true);T.clear(s);assert(s.notes[1000]===1);
 });
 test('banknote change credits finite holdings and preserves unlimited notes',()=>{
- const s=T.createGame({...WALLET_CONFIG,notes:{1000:0,10000:1}});T.add(s,10000,true);T.add(s,50);T.pay(s,{price:9030});assert(s.notes[1000]===1&&s.notes[10000]===0);
+ const s=T.createGame({...WALLET_CONFIG,notes:{5000:null,1000:0,10000:1}});T.add(s,10000,true);T.add(s,50);T.pay(s,{price:9030});assert(s.notes[1000]===1&&s.notes[10000]===0);
  const unlimited=T.createGame();T.add(unlimited,10000,true);T.pay(unlimited,{price:9030});assert(unlimited.notes[1000]===null&&unlimited.notes[10000]===null);
 });
 test('invalid settings are rejected',()=>{
- for(const config of [{...WALLET_CONFIG,maxCoinsCapacity:0},{...WALLET_CONFIG,maxCoinsCapacity:2},{...WALLET_CONFIG,coins:{...WALLET_CONFIG.coins,1:-1}},{...WALLET_CONFIG,notes:{1000:1.5,10000:0}},{...WALLET_CONFIG,notes:{1000:0}}]){
+ for(const config of [{...WALLET_CONFIG,maxCoinsCapacity:0},{...WALLET_CONFIG,maxCoinsCapacity:2},{...WALLET_CONFIG,coins:{...WALLET_CONFIG.coins,1:-1}},{...WALLET_CONFIG,notes:{5000:null,1000:1.5,10000:0}},{...WALLET_CONFIG,notes:{5000:null,1000:0}}]){
   let rejected=false;try{T.createGame(config);}catch(e){rejected=e.message.includes('wallet-config.js');}assert(rejected);
  }
 });
@@ -82,20 +82,27 @@ test('15-coin change fits empty wallet and successive bonuses reach 19',()=>{
 <main class="game">
 <header><a class="brand" href="./">◉ 小銭商店<span>THE SMALL CHANGE SHOP</span></a><div class="header-actions"><button id="sound" aria-label="効果音をオンにする" aria-pressed="false">♪ OFF</button><button id="help" aria-label="遊び方">?</button></div></header>
 <section class="collection" aria-label="購入した商品"><div class="score"><span>お買いもの総額</span><strong id="total">¥0</strong><small><span id="purchases">0</span> 点のお買いもの <span class="best">BEST <b id="best">¥0</b></span></small></div><div id="trophies" aria-hidden="true"></div><span class="shelf-label">ちょっと変な、いい買いもの。</span></section>
-<section class="product"><div class="product-top"><span class="tag">本日の掘り出しもの</span><span id="item-number">NO. 001</span></div><div class="product-art" id="art" aria-hidden="true"></div><span id="category" class="category"></span><h1 id="item-name"></h1><p id="description"></p><div class="price" id="price"></div></section>
-<section class="payment" aria-label="支払いトレイ"><div class="section-heading"><h2>お支払いトレイ</h2><button id="clear">↶ 全返却</button></div><div class="tray"><div id="tray-items"><span class="tray-hint">お金をタップして、ここに。</span></div><div class="tray-bottom"><span><span id="tray-label">投入額</span> <strong id="paid">¥0</strong></span><small id="tray-instruction">タップで1枚返却</small></div></div><div class="checkout"><div class="payment-feedback" aria-live="polite" aria-atomic="true"><span id="payment-hint">お金を選んでください</span><strong id="coin-preview"></strong></div><button id="pay" disabled>お会計 <span>✓</span></button></div></section>
-<section class="wallet" id="wallet"><div class="section-heading"><h2><span aria-hidden="true">▱</span> あなたのお財布</h2><strong id="capacity">008<span>/015</span></strong></div><div class="capacity-track"><div id="capacity-bar"></div></div><div id="coins" class="coins"></div><div class="notes"><button data-note="1000"><span class="note-seal">壱</span><span>¥1,000<small>千円札</small></span><b>∞</b></button><button data-note="10000"><span class="note-seal">万</span><span>¥10,000<small>一万円札</small></span><b>∞</b></button></div><p class="wallet-tip">小銭をタップ / 上にスワイプでトレイへ</p></section>
-<footer>小銭を減らしてPT獲得。ピッタリで財布を育てよう。<span>買いすぎ注意。小銭はもっと注意。</span></footer>
+<section class="product"><div class="product-art" id="art" aria-hidden="true"></div><span id="category" class="category"></span><h1 id="item-name"></h1><p id="description"></p><div class="price" id="price"></div></section>
+<section class="payment" aria-label="支払いトレイ"><div class="section-heading"><button id="clear">↶ 全返却</button></div><div class="tray"><div id="tray-items"><span class="tray-hint">お金をタップして、ここに。</span></div><div class="tray-bottom"><span><span id="tray-label">投入額</span> <strong id="paid">¥0</strong></span><small id="tray-instruction">タップで1枚返却</small></div></div><div class="checkout"><div class="payment-feedback" aria-live="polite" aria-atomic="true"><span id="payment-hint"></span><strong id="coin-preview"></strong></div><button id="pay" disabled>お会計 <span>✓</span></button></div></section>
+<section class="wallet" id="wallet"><div class="section-heading wallet-heading"><h2>小銭上限</h2><strong id="capacity"></strong></div><div class="capacity-track"><div id="capacity-bar"></div></div><div class="coin-total-label"><span>枚数</span><strong id="coin-total"></strong></div><div id="coins" class="coins"></div><div class="notes"><button data-note="1000"><span class="note-seal">壱</span><span>¥1,000<small>千円札</small></span><b>∞</b></button><button data-note="5000"><span class="note-seal">五</span><span>¥5,000<small>五千円札</small></span><b>∞</b></button><button data-note="10000"><span class="note-seal">万</span><span>¥10,000<small>一万円札</small></span><b>∞</b></button></div><p class="wallet-tip">小銭をタップ / 上にスワイプでトレイへ</p></section>
+
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <dialog id="help-dialog"><button class="close" data-close="help-dialog" aria-label="閉じる">×</button><span class="dialog-icon">◉</span><h2>小銭じょうずは、買いものじょうず。</h2><p>お財布のお金をじょうずに使って、ちょっと変な商品を買い続けよう。</p><ol><li>小銭やお札をタップしてトレイへ。</li><li>商品の金額以上を用意して「お会計」。</li><li>お釣りは千円単位をお札で、端数を最少枚数の硬貨で返します。</li></ol><p id="growth-rules">小銭を減らしてポイント獲得。ピッタリ支払いで財布を育てよう。</p><small>ヒント：198円に203円を出すと、お釣りは5円玉1枚。</small><button class="primary" data-close="help-dialog">お買いものをはじめる →</button></dialog>
 <dialog id="result"><div class="receipt"><span>小銭商店 / RECEIPT</span><h2>財布がパンクしました</h2><p>お買い上げ、ありがとうございました。</p><div id="receipt-items"></div><div class="receipt-total">合計 <strong id="result-total"></strong></div><p id="result-count"></p><p id="result-capacity"></p><div class="barcode" aria-hidden="true"></div><small>またのご来店を、お待ちしています。</small><button id="restart" class="primary">もう一度お買いもの →</button></div></dialog>
 </div><script src="../app.js"></script><script>
 test('initial product follows opening risk table',()=>{assert(current.riskLevel<=3);assert(G.riskLevel(current.price)===current.riskLevel);assert(state.capacity===15);});
+test('simplified UI separates limit and count and lists three notes in order',()=>{
+ const main=document.querySelector('.game');
+ for(const label of ['本日の掘り出しもの','NO. 001','お支払いトレイ','お金を選んでください','あなたのお財布','LV.'])assert(!main.textContent.includes(label));
+ assert(!main.querySelector('footer')&&!$('item-number'));
+ assert($('capacity').textContent==='15枚'&&$('coin-total').textContent==='8枚');
+ assert(JSON.stringify([...document.querySelectorAll('[data-note]')].map(b=>Number(b.dataset.note)))==='[1000,5000,10000]');
+});
 test('UI preview updates on insertion, individual return and clear',()=>{
  current={...G.products[0],price:200};renderProduct();render();
  document.querySelector('.coin-slot[data-value="100"]').click();assert(!$('coin-preview').textContent);assert($('pay').disabled);
- document.querySelector('.coin-slot[data-value="100"]').click();assert($('coin-preview').textContent.includes('-2枚'));assert($('coin-preview').textContent.includes('6/17'));assert($('exp-preview').textContent.includes('+2 PT獲得予想'));
+ document.querySelector('.coin-slot[data-value="100"]').click();assert($('coin-preview').textContent.includes('-2枚'));assert($('coin-preview').textContent.includes('会計後 6枚'));assert($('exp-preview').textContent.includes('小銭上限 17枚'));assert(!$('exp-preview').textContent.includes('PT'));
  assert($('tray-items').querySelectorAll('.tray-money').length===2);
  document.querySelector('.tray-money').click();assert($('tray-items').querySelectorAll('.tray-money').length===1);assert(!$('coin-preview').textContent);
  $('clear').click();assert(!$('coin-preview').textContent);assert(!$('exp-preview').textContent);assert(G.count(state.wallet)===8);
@@ -103,7 +110,7 @@ test('UI preview updates on insertion, individual return and clear',()=>{
 test('UI shows two change coins and a net gain of one for 9030',()=>{
  current={...G.products[0],price:9030};renderProduct();render();
  document.querySelector('[data-note="10000"]').click();document.querySelector('.coin-slot[data-value="50"]').click();
- assert($('payment-hint').textContent.includes('硬貨 2枚'));assert($('payment-hint').textContent.includes('お札 ¥1,000'));assert($('coin-preview').textContent.includes('+1枚'));assert($('coin-preview').textContent.includes('9/15'));
+ assert($('payment-hint').textContent.includes('硬貨 2枚'));assert($('payment-hint').textContent.includes('お札 ¥1,000'));assert($('coin-preview').textContent.includes('+1枚'));assert($('coin-preview').textContent.includes('会計後 9枚'));
  $('clear').click();
 });
 test('UI payment, receipt and restart preserve generated price and reset capacity',()=>{
@@ -114,11 +121,25 @@ test('UI payment, receipt and restart preserve generated price and reset capacit
 });
 async function testAsync(name, fn) {totalTests++;try {await fn(); out.textContent+='PASS '+name+'\n'; passed++;} catch(e) {out.textContent+='FAIL '+name+': '+e.message+'\n';}}
 (async () => {
- await testAsync('exact payment shows only exact popup while still awarding points',async()=>{
+ await testAsync('5000 note UI returns exactly one note and credits received change',async()=>{
+  $('restart').click();state=G.createGame({...WALLET_CONFIG,notes:{1000:0,5000:1,10000:1}});current={...G.products[0],price:3999};renderProduct();render();
+  const five=document.querySelector('[data-note="5000"]');five.click();assert(five.disabled&&five.querySelector('b').textContent==='×0');
+  document.querySelector('.tray-money').click();assert(!five.disabled&&five.querySelector('b').textContent==='×1');
+  document.querySelector('[data-note="10000"]').click();const pending=$('pay').onclick();
+  assert($('tray-items').querySelector('[data-kind="note"][data-value="5000"]'));assert(five.querySelector('b').textContent==='×1');
+  await pending;assert(five.querySelector('b').textContent==='×2'&&state.notes[5000]===2);$('restart').click();
+ });
+ await testAsync('exact checkout preserves displayed points and wear countdown',async()=>{
+  $('restart').click();state.currentEXP=9;state.wearTurns=4;current={...G.products[0],price:200};renderProduct();render();add(100);add(100);
+  assert(!$('exp-preview').textContent.includes('PT')&&!$('exp-preview').textContent.includes('摩耗'));
+  await $('pay').onclick();assert($('exp-count').textContent==='9/10 PT');assert($('wear-countdown').textContent.includes('1ターン'));
+  assert($('capacity').textContent==='17枚'&&$('coin-total').textContent==='6枚');$('restart').click();
+ });
+ await testAsync('exact payment shows exact popup and skips points',async()=>{
   $('restart').click();current={...G.products[0],price:200};renderProduct();render();add(100);add(100);
   const pending=$('pay').onclick();const popups=document.querySelectorAll('.point-popup');
-  assert(popups.length===1&&popups[0].textContent==='ぴったり！');assert(state.currentEXP===2);
-  await pending;assert(state.currentEXP===2&&state.capacity===17);
+  assert(popups.length===1&&popups[0].textContent==='ぴったり！');assert(state.currentEXP===0);
+  await pending;assert(state.currentEXP===0&&state.capacity===17&&state.wearTurns===0);
  });
  await testAsync('exact payment with no earned points and no bonus still shows exact popup',async()=>{
   $('restart').click();state=G.createGame({...WALLET_CONFIG,exactCapacityBonus:0});current={...G.products[0],price:1000};renderProduct();render();add(1000,true);
@@ -129,14 +150,14 @@ async function testAsync(name, fn) {totalTests++;try {await fn(); out.textConten
   $('restart').click();state=G.createGame({...WALLET_CONFIG,wearInterval:3,initialLevelEXP:2,levelCapacityBonus:4,exactCapacityBonus:6});
   current={...G.products[0],price:200};renderProduct();render();add(100);add(100);
   assert($('exp-gauge').max===2&&$('wear-countdown').textContent.includes('3ターン'));
-  assert($('growth-rules').textContent.includes('容量＋4枚')&&$('growth-rules').textContent.includes('容量＋6枚'));
-  assert($('exp-preview').textContent.includes('ピッタリ ＋6枚')&&$('coin-preview').textContent.includes('6/25'));
-  await $('pay').onclick();assert($('level-exp').textContent==='LV.2  0/2 PT');assert($('toast').textContent.includes('容量＋4枚'));
+  assert($('growth-rules').textContent.includes('小銭上限＋4枚')&&$('growth-rules').textContent.includes('小銭上限＋6枚'));
+  assert($('exp-preview').textContent.includes('ぴったり！')&&$('exp-preview').textContent.includes('小銭上限 21枚'));
+  await $('pay').onclick();assert($('exp-count').textContent==='0/2 PT');assert($('toast').textContent.includes('小銭上限＋6枚'));assert(state.level===1);
  });
  await testAsync('earned points pop up with change and restart cancels presentation',async()=>{
   $('restart').click();current={...G.products[0],price:200};renderProduct();render();add(100);add(100);add(5);
   const frames=productAnimation.effect.getKeyframes();assert(frames[0].transform.includes('115%'));
-  const pending=$('pay').onclick();assert(document.querySelector('.point-popup').textContent==='2pt！');
+  const pending=$('pay').onclick();assert(document.querySelector('.point-popup').textContent==='2枚へった！');
   assert(productAnimation.effect.getKeyframes().at(-1).transform.includes('-115%'));
   $('restart').click();assert(!document.querySelector('.point-popup'));const fresh=current;await pending;assert(current===fresh&&!busy);
  });
@@ -145,23 +166,23 @@ async function testAsync(name, fn) {totalTests++;try {await fn(); out.textConten
   const pending=$('pay').onclick();assert(!document.querySelector('.point-popup'));await pending;assert(!document.querySelector('.point-popup'));
  });
  await testAsync('growth UI waits for collection, combines rewards and resets on restart', async()=>{
-  $('restart').click();state.currentEXP=9;state.purchases=Array(4).fill({...G.products[0]});current={...G.products[0],price:200};renderProduct();render();add(100);add(100);
+  $('restart').click();state.currentEXP=9;state.purchases=Array(4).fill({...G.products[0]});state.wearTurns=4;current={...G.products[0],price:200};renderProduct();render();add(100);add(100);add(5);
   assert($('exp-preview').textContent.includes('+2 PT獲得予想')&&$('exp-preview').textContent.includes('摩耗 −1枚'));
-  assert($('coin-preview').textContent.includes('6/17'));
-  const pending=$('pay').onclick();assert($('level-exp').textContent==='LV.1  9/10 PT');assert(!$('exp-preview').textContent);
-  await pending;assert($('level-exp').textContent==='LV.2  1/10 PT');assert($('exp-gauge').value===1&&$('exp-gauge').max===10);assert($('capacity').textContent==='006/017');
-  $('restart').click();assert($('level-exp').textContent==='LV.1  0/10 PT'&&$('exp-gauge').value===0&&state.purchases.length===0);
+  assert($('coin-preview').textContent.includes('会計後 6枚'));
+  const pending=$('pay').onclick();assert($('exp-count').textContent==='9/10 PT');assert(!$('exp-preview').textContent);
+  await pending;assert($('exp-count').textContent==='1/10 PT');assert($('exp-gauge').value===1&&$('exp-gauge').max===10);assert($('capacity').textContent==='15枚'&&$('coin-total').textContent==='6枚');
+  $('restart').click();assert($('exp-count').textContent==='0/10 PT'&&$('exp-gauge').value===0&&state.purchases.length===0);
  });
  await testAsync('change appears as three pieces before wallet updates and controls stay locked', async()=>{
   $('restart').click();current={...G.products[0],price:9030};renderProduct();render();add(10000,true);add(50);
   const pending=$('pay').onclick();
   assert($('tray-label').textContent==='お釣り');assert($('tray-items').querySelectorAll('[data-kind="coin"]').length===2);assert($('tray-items').querySelectorAll('[data-kind="note"]').length===1);
-  assert($('capacity').textContent==='007/015');assert($('clear').disabled&&$('pay').disabled);
+  assert($('capacity').textContent==='15枚'&&$('coin-total').textContent==='7枚');assert($('clear').disabled&&$('pay').disabled);
   const total=state.total;add(1000,true);await $('pay').onclick();assert(state.total===total&&state.tray.length===0);
-  await pending;assert(!busy);assert($('capacity').textContent==='009/015');assert(!document.querySelector('.money-flight'));assert($('tray-label').textContent==='投入額');
+  await pending;assert(!busy);assert($('capacity').textContent==='15枚'&&$('coin-total').textContent==='9枚');assert(!document.querySelector('.money-flight'));assert($('tray-label').textContent==='投入額');
  });
  await testAsync('finite note UI changes only after receipt animation',async()=>{
-  $('restart').click();state=G.createGame({...WALLET_CONFIG,notes:{1000:0,10000:1}});current={...G.products[0],price:9030};render();
+  $('restart').click();state=G.createGame({...WALLET_CONFIG,notes:{5000:null,1000:0,10000:1}});current={...G.products[0],price:9030};render();
   const thousand=document.querySelector('[data-note="1000"]');assert(thousand.disabled&&thousand.querySelector('b').textContent==='×0');add(10000,true);add(50);
   const pending=$('pay').onclick();assert(thousand.querySelector('b').textContent==='×0');await pending;assert(thousand.querySelector('b').textContent==='×1'&&!thousand.disabled);
  });

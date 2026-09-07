@@ -18,7 +18,7 @@
     return coins;
   }
   const count = coins => denominations.reduce((sum, v) => sum + coins[v], 0);
-  const noteDenominations = [10000, 1000];
+  const noteDenominations = [10000, 5000, 1000];
   function createGame(config = root.WALLET_CONFIG) {
     const fail = message => { throw new Error(`wallet-config.js: ${message}`); };
     if (!config || typeof config !== 'object') fail('財布の設定がありません。');
@@ -40,7 +40,7 @@
       rules[key] = config[key];
     }
     return {wallet:{...config.coins}, notes:{...config.notes}, capacity, tray:[], total:0, purchases:[], over:false,
-      level:1, currentEXP:0, nextLevelEXP:rules.initialLevelEXP, rules};
+      level:1, currentEXP:0, nextLevelEXP:rules.initialLevelEXP, wearTurns:0, rules};
   }
   function changeNotes(amount) {
     const notes = {};
@@ -76,7 +76,7 @@
   }
   const paid = state => state.tray.reduce((sum, money) => sum + money.value, 0);
   function add(state, value, note = false) {
-    if (state.over || (note ? ![1000, 10000].includes(value) : !denominations.includes(value))) return false;
+    if (state.over || (note ? !noteDenominations.includes(value) : !denominations.includes(value))) return false;
     const holdings = note ? state.notes : state.wallet;
     if (holdings[value] === 0) return false;
     if (holdings[value] !== null) holdings[value]--;
@@ -97,23 +97,25 @@
     const changeCount = count(returned);
     const after = count(state.wallet) + changeCount;
     // Coins in the tray still belong to the pre-payment wallet.
-    const earnedEXP = Math.max(0, spentCoins - changeCount);
+    const exact = change === 0;
+    const earnedEXP = exact ? 0 : Math.max(0, spentCoins - changeCount);
     let currentEXP = state.currentEXP + earnedEXP;
     const nextLevelEXP = state.rules.initialLevelEXP;
     let level = state.level, levelUps = 0;
-    while (currentEXP >= nextLevelEXP) {
+    while (!exact && currentEXP >= nextLevelEXP) {
       currentEXP -= nextLevelEXP;
       level++; levelUps++;
     }
-    const exactBonus = change === 0 ? state.rules.exactCapacityBonus : 0;
+    const exactBonus = exact ? state.rules.exactCapacityBonus : 0;
     const levelCapacityGain = levelUps * state.rules.levelCapacityBonus;
     const turn = state.purchases.length + 1;
+    const wearTurns = state.wearTurns + (exact ? 0 : 1);
     const grownCapacity = state.capacity + levelCapacityGain + exactBonus;
     // Preserve configured capacities below 10; wear must never increase capacity.
-    const wear = turn % state.rules.wearInterval === 0 && grownCapacity > 10 ? 1 : 0;
+    const wear = !exact && wearTurns % state.rules.wearInterval === 0 && grownCapacity > 10 ? 1 : 0;
     const capacityAfter = grownCapacity - wear;
     return {change, returned, returnedNotes: changeNotes(change), banknoteAmount: change - change % 1000, changeCount, delta: changeCount - spentCoins,
-      after, earnedEXP, currentEXP, nextLevelEXP, level, levelUps, levelCapacityGain, exactBonus, wear, turn, capacityAfter,
+      after, exact, earnedEXP, currentEXP, nextLevelEXP, level, levelUps, levelCapacityGain, exactBonus, wear, wearTurns, turn, capacityAfter,
       upgraded: levelUps > 0 || exactBonus > 0, over: after > capacityAfter};
   }
   function pay(state, product) {
@@ -127,6 +129,7 @@
     state.tray = []; state.total += product.price; state.purchases.push(product);
     state.capacity = preview.capacityAfter;
     state.currentEXP = preview.currentEXP; state.nextLevelEXP = preview.nextLevelEXP; state.level = preview.level;
+    state.wearTurns = preview.wearTurns;
     state.over = over;
     return preview;
   }

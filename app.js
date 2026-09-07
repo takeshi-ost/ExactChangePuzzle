@@ -25,7 +25,7 @@ productContent.append(...productPanel.childNodes);
 productPanel.append(productContent);
 const growth = document.createElement('div');
 growth.className = 'growth';
-growth.innerHTML = '<div class="growth-label"><strong id="level-exp"></strong><small id="wear-countdown"></small></div><progress id="exp-gauge" aria-label="次のレベルまでのポイント" max="10" value="0"></progress>';
+growth.innerHTML = '<div class="growth-label"><strong id="exp-count"></strong><small id="wear-countdown"></small></div><progress id="exp-gauge" aria-label="次の上限拡張までのポイント" max="10" value="0"></progress>';
 $('wallet').querySelector('.capacity-track').after(growth);
 const expPreview = document.createElement('span');
 expPreview.id = 'exp-preview';
@@ -63,7 +63,7 @@ async function slideProduct(entering) {
 async function showPoints(points, exact = false) {
   if (!exact && points <= 0) return;
   const el = document.createElement('div'); el.className = 'point-popup';
-  el.textContent = exact ? 'ぴったり！' : `${points}pt！`; el.setAttribute('role', 'status');
+  el.textContent = exact ? 'ぴったり！' : `${points}枚へった！`; el.setAttribute('role', 'status');
   document.querySelector('.payment').append(el);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const duration = reduced ? 900 : 1150;
@@ -81,23 +81,22 @@ function renderProduct() {
   $('art').textContent = current.emoji; $('art').style.background = current.color;
   $('item-name').textContent = current.name; $('category').textContent = current.category;
   $('description').textContent = current.description; $('price').textContent = yen(current.price);
-  $('item-number').textContent = `NO. ${String(state.purchases.length + 1).padStart(3, '0')}`;
   void slideProduct(true);
 }
 function render() {
   const visibleWallet = walletDisplay?.wallet || state.wallet;
   const visibleCapacity = walletDisplay?.capacity ?? state.capacity;
   const visibleGrowth = walletDisplay || state;
-  $('level-exp').textContent = `LV.${visibleGrowth.level}  ${visibleGrowth.currentEXP}/${visibleGrowth.nextLevelEXP} PT`;
+  $('exp-count').textContent = `${visibleGrowth.currentEXP}/${visibleGrowth.nextLevelEXP} PT`;
   $('exp-gauge').max = visibleGrowth.nextLevelEXP;
   $('exp-gauge').value = visibleGrowth.currentEXP;
-  $('wear-countdown').textContent = `摩耗まで ${visibleGrowth.rules.wearInterval - visibleGrowth.purchases.length % visibleGrowth.rules.wearInterval}ターン`;
+  $('wear-countdown').textContent = `摩耗まで ${visibleGrowth.rules.wearInterval - visibleGrowth.wearTurns % visibleGrowth.rules.wearInterval}ターン`;
   const rules = state.rules;
-  $('growth-rules').textContent = `小銭を減らした枚数がポイントに。毎回${rules.initialLevelEXP}PTでレベルアップ・容量＋${rules.levelCapacityBonus}枚（必要PTは固定）。お釣り0円なら容量＋${rules.exactCapacityBonus}枚。${rules.wearInterval}回の会計ごとに容量−1枚（摩耗は10枚まで）。上限を超えたらゲームオーバー！`;
-  document.querySelector('.game>footer').textContent = `小銭を減らしてPT獲得。ピッタリで容量＋${rules.exactCapacityBonus}。`;
+  $('growth-rules').textContent = `お釣りがある会計では、小銭を減らした枚数がポイントに。毎回${rules.initialLevelEXP}PTで小銭上限＋${rules.levelCapacityBonus}枚。お釣り0円なら小銭上限＋${rules.exactCapacityBonus}枚だけを適用し、ポイント・摩耗カウントは進みません。お釣りがある会計${rules.wearInterval}回ごとに小銭上限−1枚（摩耗は10枚まで）。上限を超えたらゲームオーバー！`;
   const count = G.count(visibleWallet), paid = G.paid(state);
   $('total').textContent = yen(state.total); $('purchases').textContent = state.purchases.length; $('best').textContent = yen(best);
-  $('capacity').innerHTML = `${String(count).padStart(3, '0')}<span>/${String(visibleCapacity).padStart(3, '0')}</span>`;
+  $('capacity').textContent = `${visibleCapacity}枚`;
+  $('coin-total').textContent = `${count}枚`;
   $('capacity-bar').style.width = `${Math.min(100, count / visibleCapacity * 100)}%`;
   $('capacity-bar').style.background = count >= visibleCapacity - 2 ? '#c17d54' : '#82966a';
   $('coins').replaceChildren(...G.denominations.map(value => {
@@ -128,8 +127,8 @@ function render() {
   $('paid').textContent = yen(paid); $('clear').disabled = busy || state.over || !state.tray.length;
   $('pay').disabled = busy || state.over || paid < current.price;
   const preview = G.previewPayment(state, current);
-  $('coin-preview').textContent = !busy && preview ? `小銭 ${preview.delta > 0 ? '+' : ''}${preview.delta}枚（${preview.after}/${preview.capacityAfter}枚）` : '';
-  const prediction = !busy && preview ? [preview.earnedEXP ? `+${preview.earnedEXP} PT獲得予想` : '', preview.levelUps ? `LV.${preview.level}へ` : '', preview.exactBonus ? `ピッタリ ＋${preview.exactBonus}枚` : '', preview.wear ? '摩耗 −1枚' : ''].filter(Boolean).join(' · ') : '';
+  $('coin-preview').textContent = !busy && preview ? `小銭 ${preview.delta > 0 ? '+' : ''}${preview.delta}枚 · 会計後 ${preview.after}枚` : '';
+  const prediction = !busy && preview ? [preview.earnedEXP ? `+${preview.earnedEXP} PT獲得予想` : '', preview.exact ? 'ぴったり！' : '', preview.capacityAfter !== state.capacity ? `小銭上限 ${preview.capacityAfter}枚` : '', preview.wear ? '摩耗 −1枚' : ''].filter(Boolean).join(' · ') : '';
   const changedPrediction = $('exp-preview').textContent !== prediction;
   $('exp-preview').textContent = prediction;
   if (changedPrediction && prediction && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -137,7 +136,7 @@ function render() {
   }
   $('coin-preview').dataset.tone = preview?.over ? 'danger' : preview?.delta < 0 ? 'good' : 'neutral';
   if (busy) $('payment-hint').textContent = 'お買い上げありがとうございます';
-  else if (paid < current.price) $('payment-hint').textContent = paid ? `あと ${yen(current.price - paid)}` : 'お金を選んでください';
+  else if (paid < current.price) $('payment-hint').textContent = paid ? `あと ${yen(current.price - paid)}` : '';
   else {
     const { returned } = preview;
     $('payment-hint').textContent = `お釣り ${yen(paid - current.price)} · 硬貨 ${G.count(returned)}枚${preview.banknoteAmount ? ` ＋ お札 ${yen(preview.banknoteAmount)}` : ''}${preview.over ? '\n⚠ お財布の容量を超えます' : ''}`;
@@ -162,7 +161,7 @@ function trophy(product) {
 }
 function showResult() {
   $('result-total').textContent = yen(state.total); $('result-count').textContent = `${state.purchases.length} 点のお買いもの`;
-  $('result-capacity').textContent = `小銭 ${G.count(state.wallet)}枚 / 容量 ${state.capacity}枚 · LV.${state.level} ${state.currentEXP}/${state.nextLevelEXP} PT`;
+  $('result-capacity').textContent = `小銭上限 ${state.capacity}枚 · 枚数 ${G.count(state.wallet)}枚 · ${state.currentEXP}/${state.nextLevelEXP} PT`;
   $('receipt-items').replaceChildren(...state.purchases.map(p => { const row = document.createElement('div'); row.className = 'receipt-row'; const label = document.createElement('span'), price = document.createElement('span'); label.textContent = `${p.emoji} ${p.name}`; price.textContent = yen(p.price); row.append(label, price); return row; }));
   $('result').showModal();
 }
@@ -274,7 +273,7 @@ $('pay').onclick = async () => {
   walletDisplay = null; render();
   if (result.changeCount) se('coin', result.changeCount);
   else if (result.banknoteAmount) se('note');
-  const rewards = [result.earnedEXP ? `+${result.earnedEXP} PT獲得` : '', result.levelUps ? `LV.${state.level}！ 容量＋${result.levelCapacityGain}枚` : '', result.exactBonus ? `ピッタリ！ 容量＋${result.exactBonus}枚` : '', result.wear ? '財布の摩耗：容量−1枚' : ''].filter(Boolean);
+  const rewards = [result.earnedEXP ? `+${result.earnedEXP} PT獲得` : '', result.levelUps ? `小銭上限＋${result.levelCapacityGain}枚` : '', result.exactBonus ? `ぴったり！ 小銭上限＋${result.exactBonus}枚` : '', result.wear ? '財布の摩耗：小銭上限−1枚' : ''].filter(Boolean);
   toast(rewards.length ? rewards.join(' / ') : `お釣り ${yen(result.change)} · 硬貨 ${result.changeCount}枚${result.banknoteAmount ? ` ＋ お札 ${yen(result.banknoteAmount)}` : ''}`);
   if (result.upgraded || result.wear) {
     $('wallet').classList.add(result.upgraded ? 'upgrade' : 'wear');
