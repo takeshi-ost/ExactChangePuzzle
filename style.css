@@ -94,7 +94,7 @@ body{
 /* Five discrete points divide the held count by the wallet limit. */
 .growth{margin:calc(6 * var(--u)) 0 calc(8 * var(--u))}
 #exp-indicator{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:calc(4 * var(--u))}
-#exp-indicator>span{height:calc(5 * var(--u));border-radius:calc(3 * var(--u));background:#d8decd;border:1px solid #bdc8ae;transition:background .18s,box-shadow .18s}
+#exp-indicator>span{height:calc(5 * var(--u));border-radius:calc(3 * var(--u));background:#d8decd;border:1px solid #bdc8ae;transition:background .02s,box-shadow .02s}
 #exp-indicator>span.filled{background:#699c53;border-color:#568544;box-shadow:0 0 5px #699c5350}
 #capacity{display:inline-block;transform-origin:right center}
 #capacity.capacity-up{animation:capacity-pop .8s ease-out}

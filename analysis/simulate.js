@@ -26,9 +26,9 @@ globalThis.simulate = function(runs = 2000, maxTurns = 1000) {
       const notes=Math.max(0,Math.ceil((product.price-sum)/1000));
       const change=sum+notes*1000-product.price, exact=change===0;
       const returned=changeCount[change%1000], earned=exact?0:Math.max(0,dp[sum]-returned);
-      const bonus=exact?state.rules.exactCapacityBonus:(state.currentEXP+earned>=state.nextLevelEXP?state.rules.levelCapacityBonus:0);
+      const bonus=exact?state.rules.exactCapacityBonus:Math.floor((state.currentEXP+earned)/state.nextLevelEXP)*state.rules.levelCapacityBonus;
       const cap=state.capacity+bonus-(bonus>0?0:1), after=held-dp[sum]+returned;
-      const remaining=exact?state.currentEXP:(state.currentEXP+earned>=state.nextLevelEXP?0:state.currentEXP+earned);
+      const remaining=exact?state.currentEXP:(state.currentEXP+earned)%state.nextLevelEXP;
       // Survive first, then maximize immediate free slots, capacity, remaining PT,
       // and minimize overpayment. This is a one-turn policy, not a global optimum.
       const key=[Number(cap>0&&after<=cap),cap-after,cap,remaining,-change,-sum];

@@ -173,8 +173,26 @@ async function testAsync(name, fn) {totalTests++;try {await fn(); out.textConten
   assert($('exp-preview').textContent.includes('+2 PT獲得予想')&&!$('exp-preview').textContent.includes('摩耗'));
   assert($('coin-preview').textContent.includes('会計後 6枚'));
   const pending=$('pay').onclick();assert($('exp-indicator').getAttribute('aria-valuenow')==='4');assert(!$('exp-preview').textContent);
-  await pending;assert($('exp-indicator').getAttribute('aria-valuenow')==='0');assert($('exp-indicator').querySelectorAll('.filled').length===0);assert($('capacity').textContent==='16枚'&&$('coin-total').textContent==='6枚');
+  await pending;assert($('exp-indicator').getAttribute('aria-valuenow')==='1');assert($('exp-indicator').querySelectorAll('.filled').length===1);assert($('capacity').textContent==='16枚'&&$('coin-total').textContent==='6枚');
   $('restart').click();assert($('exp-indicator').getAttribute('aria-valuenow')==='0'&&state.purchases.length===0);
+ });
+ await testAsync('points fill in order and carry only after the capacity animation', async()=>{
+  $('restart').click();state.currentEXP=3;state.wallet={500:0,100:0,50:0,10:0,5:0,1:7};
+  current={...G.products[0],price:507};render();
+  for(let i=0;i<7;i++)add(1);add(1000,true);
+  const original=renderPoints, frames=[];
+  renderPoints=points=>{frames.push({points,time:performance.now(),capacity:$('capacity').textContent});original(points);};
+  try {
+    await $('pay').onclick();
+    const full=frames.findIndex(f=>f.points===5);
+    const dark=frames.findIndex((f,i)=>i>full&&f.points===0);
+    const remainder=frames.findIndex((f,i)=>i>dark&&f.points===1);
+    assert(full>0&&frames[full-1].points===4&&dark>full&&remainder>dark);
+    assert(frames[dark].capacity==='15枚'&&frames[remainder].capacity==='16枚');
+    assert(frames[remainder].time-frames[dark].time>=800);
+    assert(frames.slice(remainder,remainder+4).map(f=>f.points).join(',')==='1,2,3,4');
+    assert($('exp-indicator').querySelectorAll('.filled').length===4);
+  } finally {renderPoints=original;$('restart').click();}
  });
  await testAsync('change appears as three pieces before wallet updates and controls stay locked', async()=>{
   $('restart').click();current={...G.products[0],price:9030};renderProduct();render();add(10000,true);add(50);

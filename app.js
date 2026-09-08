@@ -83,8 +83,14 @@ async function showPoints(points, exact = false, paymentState = state) {
   const entry = {el, animation}; pointPopups.add(entry);
   try { await Promise.race([animation.finished, pause(duration + 100)]); }
   catch {} finally { animation.cancel(); el.remove(); pointPopups.delete(entry); }
-  if (!exact && state === paymentState && walletDisplay) {
-    renderPoints(Math.min(5, walletDisplay.currentEXP + points));
+}
+// Keep each step short; state identity prevents old sequences touching a restarted game.
+async function lightPoints(from, to, paymentState) {
+  for (let points = from + 1; points <= to; points++) {
+    if (state !== paymentState) return;
+    if (walletDisplay) walletDisplay.currentEXP = points;
+    renderPoints(points);
+    await pause(25);
   }
 }
 function renderProduct() {
@@ -99,7 +105,7 @@ function render() {
   const visibleGrowth = walletDisplay || state;
   renderPoints(visibleGrowth.currentEXP);
   const rules = state.rules;
-  $('growth-rules').textContent = `小銭を減らした枚数がポイントに。5PTで小銭上限＋${rules.levelCapacityBonus}枚。お釣り0円なら小銭上限＋${rules.exactCapacityBonus}枚。5PTの報酬獲得時に保有PTを0にリセットします。ピッタリ支払いでは保有PTを保持します。上限が増えなかった会計は小銭上限−1枚。上限が0以下になるか、小銭の枚数が上限を超えたらゲームオーバー！`;
+  $('growth-rules').textContent = `小銭を減らした枚数がポイントに。5PTで小銭上限＋${rules.levelCapacityBonus}枚。お釣り0円なら小銭上限＋${rules.exactCapacityBonus}枚。5PTごとに報酬を獲得し、余ったPTは次の蓄積に繰り越します。ピッタリ支払いでは保有PTを保持します。上限が増えなかった会計は小銭上限−1枚。上限が0以下になるか、小銭の枚数が上限を超えたらゲームオーバー！`;
   const count = G.count(visibleWallet), paid = G.paid(state);
   $('total').textContent = yen(state.total); $('purchases').textContent = state.purchases.length; $('best').textContent = yen(best);
   $('capacity').textContent = `${visibleCapacity}枚`;
@@ -276,11 +282,21 @@ $('pay').onclick = async () => {
   await Promise.all([slideProduct(false), animateChange(result, paymentState)]);
   if (state !== paymentState) return;
   if (result.earnedEXP > 0) {
-    renderPoints(Math.min(5, before.currentEXP + result.earnedEXP));
-    await pause(220);
+    await lightPoints(before.currentEXP, Math.min(5, before.currentEXP + result.earnedEXP), paymentState);
     if (state !== paymentState) return;
   }
-  walletDisplay = null; render();
+  if (result.levelUps) {
+    await pause(60); // Briefly show the completed five-point indicator.
+    if (state !== paymentState) return;
+    walletDisplay.currentEXP = 0;
+    renderPoints(0);
+    await pause(60); // Let the indicator go dark before the capacity animation.
+    if (state !== paymentState) return;
+    walletDisplay = {...state, currentEXP:0};
+  } else {
+    walletDisplay = null;
+  }
+  render();
   if (state.capacity > before.capacity) {
     $('capacity').classList.remove('capacity-up');
     void $('capacity').offsetWidth;
@@ -296,6 +312,12 @@ $('pay').onclick = async () => {
     await pause(800);
     if (state !== paymentState) return;
     $('wallet').classList.remove('upgrade', 'wear');
+  }
+  if (result.levelUps) {
+    await lightPoints(0, state.currentEXP, paymentState);
+    if (state !== paymentState) return;
+    walletDisplay = null;
+    render();
   }
   if (result.over) { burst(); await pause(850); if (state === paymentState) showResult(); }
   else { busy = false; nextProduct(); render(); }

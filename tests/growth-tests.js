@@ -28,7 +28,7 @@ test('custom growth rules affect threshold, rewards, wear and preview together',
   T.add(s,100); T.add(s,100); T.add(s,5);
   const p = T.previewPayment(s,{price:200}); T.pay(s,{price:200});
   assert(p.earnedEXP === 2 && p.levelCapacityGain === 4 && p.exactBonus === 0 && p.wear === 0);
-  assert(s.level === 2 && s.currentEXP === 0 && s.nextLevelEXP === 5 && s.capacity === 19 && s.capacity === p.capacityAfter);
+  assert(s.level === 2 && s.currentEXP === 1 && s.nextLevelEXP === 5 && s.capacity === 19 && s.capacity === p.capacityAfter);
   config.levelCapacityBonus = 99; assert(s.rules.levelCapacityBonus === 4);
 });
 test('fixed thresholds and zero capacity bonuses are supported', () => {
@@ -64,21 +64,21 @@ test('returned tray coins and insufficient payment never award points or turns',
   T.add(s,100); T.clear(s);
   assert(s.currentEXP === 0 && s.purchases.length === 0 && s.capacity === 15);
 });
-test('level threshold consumes points, resets all points and adds capacity', () => {
+test('level threshold consumes five points, carries excess and adds capacity', () => {
   const s = T.createGame(); s.currentEXP = 4;
   T.add(s,100); T.add(s,100); T.add(s,5);
   const before = JSON.stringify(s), p = T.previewPayment(s,{price:200});
   assert(JSON.stringify(s) === before && p.earnedEXP === 2 && p.capacityAfter === 16);
   T.pay(s,{price:200});
-  assert(s.level === 2 && s.currentEXP === 0 && s.nextLevelEXP === 5 && s.capacity === 16);
+  assert(s.level === 2 && s.currentEXP === 1 && s.nextLevelEXP === 5 && s.capacity === 16);
 });
-test('one payment grants one expansion and discards excess points', () => {
+test('one payment grants multiple expansions and carries excess points', () => {
   const s = T.createGame({...WALLET_CONFIG,coins:{500:0,100:0,50:0,10:0,5:0,1:40},notes:{5000:null,1000:null,10000:null},maxCoinsCapacity:40});
   while(s.wallet[1]) T.add(s,1);
   T.add(s,1000,true);
   const r = T.pay(s,{price:540}); // Return one 500-yen coin: net reduction 39.
-  assert(r.earnedEXP === 39 && r.levelUps === 1 && s.level === 2);
-  assert(s.currentEXP === 0 && s.nextLevelEXP === 5 && s.capacity === 41);
+  assert(r.earnedEXP === 39 && r.levelUps === 7 && s.level === 8);
+  assert(s.currentEXP === 4 && s.nextLevelEXP === 5 && s.capacity === 47);
 });
 test('exact payment rewards capacity even when wallet is not empty', () => {
   const s = T.createGame(); T.add(s,100); T.add(s,100);
@@ -196,4 +196,18 @@ test('catalog contains 100 unique products split evenly between surreal and ever
     }
     assert(JSON.stringify(p) === before);
   }
+});
+
+test('three existing points plus six earned carry four into the next purchase', () => {
+  const s=T.createGame({...WALLET_CONFIG,coins:{500:0,100:0,50:0,10:0,5:0,1:7}});
+  s.currentEXP=3;
+  for(let i=0;i<7;i++) T.add(s,1);
+  T.add(s,1000,true);
+  const before=JSON.stringify(s), preview=T.previewPayment(s,{price:507});
+  assert(JSON.stringify(s)===before && preview.earnedEXP===6 && preview.currentEXP===4);
+  const result=T.pay(s,{price:507});
+  assert(result.levelUps===1 && s.level===2 && s.capacity===16 && s.currentEXP===4 && result.wear===0);
+  T.add(s,500);T.add(s,1000,true);
+  const next=T.pay(s,{price:500}); // Banknote-only change: one coin spent earns the fifth point.
+  assert(next.earnedEXP===1 && next.levelUps===1 && s.currentEXP===0 && s.capacity===17);
 });

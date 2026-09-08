@@ -107,8 +107,9 @@
     const nextLevelEXP = LEVEL_EXP;
     let level = state.level, levelUps = 0;
     if (!exact && currentEXP >= nextLevelEXP) {
-      currentEXP = 0;
-      level++; levelUps++;
+      levelUps = Math.floor(currentEXP / nextLevelEXP);
+      currentEXP %= nextLevelEXP;
+      level += levelUps;
     }
     const exactBonus = exact ? state.rules.exactCapacityBonus : 0;
     const levelCapacityGain = levelUps * state.rules.levelCapacityBonus;
