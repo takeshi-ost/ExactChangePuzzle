@@ -1,6 +1,6 @@
 # 現行設定のシミュレーション
 
-ゲーム本体は変更せず、wallet-config.js と game.js を直接読み込みます。
+ゲーム本体は変更せず、wallet-config.js・products.js・game.js を直接読み込みます。
 
 macOS（Python 3・OS標準JavaScriptCore）での再実行：
 

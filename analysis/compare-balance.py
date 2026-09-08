@@ -25,11 +25,11 @@ for name,threshold,bonus,exact in variants:
  saved=root/f'analysis/comparison/{name}.json'
  if saved.exists():
   cached=json.loads(saved.read_text())
-  sources=['wallet-config.js','game.js','app.js','analysis/simulate.js']
-  if (cached['runs']==runs and cached['maxTurns']==limit and cached['threshold']==threshold and cached['exact_pt']==exact and cached['config']['levelCapacityBonus']==bonus and all(cached['source_sha256'][f]==hashlib.sha256((root/f).read_bytes()).hexdigest() for f in sources)):
+  sources=['wallet-config.js','products.js','game.js','app.js','analysis/simulate.js']
+  if (cached['runs']==runs and cached['maxTurns']==limit and cached['threshold']==threshold and cached['exact_pt']==exact and cached['config']['levelCapacityBonus']==bonus and all(cached['source_sha256'].get(f)==hashlib.sha256((root/f).read_bytes()).hexdigest() for f in sources)):
    all_results.append(cached);print('Reusing verified results',name,flush=True);continue
  ctx=j.JSGlobalContextCreate(None)
- run((root/'wallet-config.js').read_text());run(f'WALLET_CONFIG.levelCapacityBonus={bonus};const EXACT_PT={str(exact).lower()};')
+ run((root/'wallet-config.js').read_text());run((root/'products.js').read_text());run(f'WALLET_CONFIG.levelCapacityBonus={bonus};const EXACT_PT={str(exact).lower()};')
  source=replace_once(game,'const LEVEL_EXP = 5;',f'const LEVEL_EXP = {threshold};')
  if exact:
   source=replace_once(source,'const earnedEXP = exact ? 0 : Math.max(0, spentCoins - changeCount);','const earnedEXP = Math.max(0, spentCoins - changeCount);')
@@ -44,7 +44,7 @@ for name,threshold,bonus,exact in variants:
  print('Running',name,runs,flush=True);start=time.monotonic()
  result=json.loads(run(f'JSON.stringify(simulate({runs},{limit}))'))
  result.update(variant=name,threshold=threshold,exact_pt=exact,elapsed_seconds=time.monotonic()-start)
- result['source_sha256']={f:hashlib.sha256((root/f).read_bytes()).hexdigest() for f in ['wallet-config.js','game.js','app.js','analysis/simulate.js','analysis/compare-balance.py']}
+ result['source_sha256']={f:hashlib.sha256((root/f).read_bytes()).hexdigest() for f in ['wallet-config.js','products.js','game.js','app.js','analysis/simulate.js','analysis/compare-balance.py']}
  for row in result['data']:
   assert row['capacity']==result['config']['maxCoinsCapacity']+2*row['exactCount']+bonus*row['levelUps']-row['wearCount']
   assert row['over']==(row['capacity']<=0 or row['coins']>row['capacity'])

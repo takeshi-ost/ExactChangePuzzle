@@ -2,14 +2,17 @@
   'use strict';
   const LEVEL_EXP = 5;
   const denominations = [500, 100, 50, 10, 5, 1];
-  const products = [
-    { name: '高級アイスのフタ裏の濃いところ', price: 198, emoji: '🍨', category: '日常の珍品', description: 'いちばんおいしいところ、集めました。', color: '#eee4d6' },
-    { name: 'なぜか1本だけ余る謎のネジ', price: 38, emoji: '🔩', category: '日常の珍品', description: '組み立ては完了。たぶん、きっと。', color: '#e2e9e7' },
-    { name: 'すれ違った犬に2度見された経験', price: 1280, emoji: '🐕', category: 'シュール', description: 'あの日の視線を、あなたにも。', color: '#eee4cf' },
-    { name: '絶対に1回で出ないガチャ', price: 489, emoji: '🎰', category: 'シュール', description: '次こそは、という気持ちが付属します。', color: '#e5e5f0' },
-    { name: '実家で見つかった謎の壺', price: 9800, emoji: '🏺', category: '高額トラップ', description: '鑑定には、まだ出していません。', color: '#eedfda' },
-    { name: '1本丸ごと食べる巨大ちくわ', price: 3980, emoji: '🍢', category: '高額トラップ', description: '穴の向こうに、明日が見える。', color: '#e6e9d6' }
-  ];
+  const products = root.PRODUCT_CATALOG;
+  if (!Array.isArray(products) || !products.length) throw new Error('products.js: 商品リストがありません。');
+  const productNames = new Set();
+  for (const product of products) {
+    if (!product || ['name', 'emoji', 'category', 'description', 'color'].some(key => typeof product[key] !== 'string' || !product[key].trim()) ||
+        !Number.isSafeInteger(product.price) || product.price < 1 || product.price > Number.MAX_SAFE_INTEGER - 1000 ||
+        !['シュール', '日常'].includes(product.category) || !/^#[0-9a-f]{6}$/i.test(product.color) || productNames.has(product.name)) {
+      throw new Error('products.js: 商品の必須項目・価格・分類・色・名前の重複を確認してください。');
+    }
+    productNames.add(product.name);
+  }
   function changeCoins(amount) {
     if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Invalid change');
     // Return whole thousands as banknotes; only the remainder enters the coin wallet.

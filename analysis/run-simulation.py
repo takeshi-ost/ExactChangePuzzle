@@ -11,11 +11,11 @@ def run(s):
  v=j.JSValueToStringCopy(ctx,e if e.value else r,None);n=j.JSStringGetMaximumUTF8CStringSize(v);b=c.create_string_buffer(n);j.JSStringGetUTF8CString(v,b,n);j.JSStringRelease(v)
  if e.value: raise Exception(b.value.decode())
  return b.value.decode()
-for f in ['wallet-config.js','game.js','analysis/simulate.js']:run((root/f).read_text())
+for f in ['wallet-config.js','products.js','game.js','analysis/simulate.js']:run((root/f).read_text())
 runs=int(sys.argv[1]) if len(sys.argv)>1 else 2000
 limit=int(sys.argv[2]) if len(sys.argv)>2 else 1000
 t=time.monotonic();result=json.loads(run(f'JSON.stringify(simulate({runs},{limit}))'))
 result['elapsed_seconds']=time.monotonic()-t
-result['source_sha256']={f:hashlib.sha256((root/f).read_bytes()).hexdigest() for f in ['wallet-config.js','game.js','app.js','analysis/simulate.js']}
+result['source_sha256']={f:hashlib.sha256((root/f).read_bytes()).hexdigest() for f in ['wallet-config.js','products.js','game.js','app.js','analysis/simulate.js']}
 (root/'analysis/simulation-results.json').write_text(json.dumps(result,ensure_ascii=False))
 print(json.dumps({k:v for k,v in result.items() if k!='data'},ensure_ascii=False,indent=2))

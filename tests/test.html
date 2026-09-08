@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><meta charset="utf-8"><title>Game tests</title><body><pre id="results"></pre><script src="../wallet-config.js"></script><script src="../game.js"></script><script>
+<!doctype html><html lang="ja"><meta charset="utf-8"><title>Game tests</title><body><pre id="results"></pre><script src="../wallet-config.js"></script><script src="../products.js"></script><script src="../game.js"></script><script>
 const configuredWallet = WALLET_CONFIG; globalThis.WALLET_CONFIG = {coins:{500:0,100:2,50:1,10:2,5:1,1:2},notes:{5000:null,1000:null,10000:null},maxCoinsCapacity:15,levelCapacityBonus:1,exactCapacityBonus:2};
 const T=CoinGame, out=document.getElementById('results'); let passed=0, totalTests=0;
 function test(name,fn){totalTests++;try{fn();out.textContent+='PASS '+name+'\n';passed++;}catch(e){out.textContent+='FAIL '+name+': '+e.message+'\n';}}

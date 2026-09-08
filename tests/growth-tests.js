@@ -178,3 +178,22 @@ test('points preserved by exact payment can earn the next threshold reward', () 
   const next=T.pay(s,{price:200});
   assert(next.earnedEXP===2&&next.levelUps===1&&next.wear===0&&s.currentEXP===0&&s.capacity===20);
 });
+
+test('catalog contains 100 unique products split evenly between surreal and everyday', () => {
+  assert(T.products === PRODUCT_CATALOG && T.products.length === 100);
+  assert(new Set(T.products.map(p => p.name)).size === 100);
+  for (const category of ['シュール', '日常']) assert(T.products.filter(p => p.category === category).length === 50);
+  for (const p of T.products) {
+    assert(Number.isSafeInteger(p.price) && p.price > 0);
+    for (const key of ['name', 'description', 'emoji', 'color']) assert(typeof p[key] === 'string' && p[key].trim());
+    const before = JSON.stringify(p);
+    for (const roll of [0, .1, .3, .6, .9]) {
+      let calls = 0;
+      const generated = T.generateProduct(p, 10, () => calls++ === 0 ? roll : .5);
+      assert(generated.name === p.name && generated.category === p.category);
+      assert(generated.price > Math.floor(p.price / 1000) * 1000 && generated.price <= Math.floor(p.price / 1000) * 1000 + 1000);
+      assert(T.riskLevel(generated.price) === generated.riskLevel);
+    }
+    assert(JSON.stringify(p) === before);
+  }
+});

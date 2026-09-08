@@ -1,4 +1,4 @@
-// Loaded after wallet-config.js and game.js. No browser UI or rule reimplementation.
+// Loaded after wallet-config.js, products.js and game.js. No browser UI or rule reimplementation.
 globalThis.simulate = function(runs = 2000, maxTurns = 1000) {
   const G = CoinGame, values = G.denominations;
   if (G.noteDenominations.some(v => WALLET_CONFIG.notes[v] !== null)) throw Error('These policies require unlimited notes.');
