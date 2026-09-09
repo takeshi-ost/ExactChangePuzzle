@@ -1,0 +1,50 @@
+{
+  "smart": {
+    "runs": 10000,
+    "finished": 10000,
+    "censored": 0,
+    "censored_rate": 0.0,
+    "observed_mean_turns": 26.792,
+    "observed_mean_total": 30539.3318,
+    "finished_mean_turns": 26.792,
+    "finished_mean_total": 30539.3318,
+    "survivor_mean_capacity": null,
+    "survivor_mean_coins": null,
+    "max_capacity": 14,
+    "exact_rate": 0.10733054643177067,
+    "empty_wallet_count": 363,
+    "survival": {
+      "10": 0.9621,
+      "20": 0.5642,
+      "50": 0.0778,
+      "100": 0.0073,
+      "250": 0.0,
+      "500": 0.0,
+      "1000": 0.0
+    }
+  },
+  "balanced": {
+    "runs": 10000,
+    "finished": 9816,
+    "censored": 184,
+    "censored_rate": 0.0184,
+    "observed_mean_turns": 36.4573,
+    "observed_mean_total": 40256.1251,
+    "finished_mean_turns": 18.39578239608802,
+    "finished_mean_total": 21209.54696414018,
+    "survivor_mean_capacity": 577.7173913043479,
+    "survivor_mean_coins": 24.043478260869566,
+    "max_capacity": 640,
+    "exact_rate": 0.32536967904918906,
+    "empty_wallet_count": 393,
+    "survival": {
+      "10": 0.7933,
+      "20": 0.3514,
+      "50": 0.0297,
+      "100": 0.0185,
+      "250": 0.0184,
+      "500": 0.0184,
+      "1000": 0.0184
+    }
+  }
+}

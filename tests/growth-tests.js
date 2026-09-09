@@ -211,3 +211,53 @@ test('three existing points plus six earned carry four into the next purchase', 
   const next=T.pay(s,{price:500}); // Banknote-only change: one coin spent earns the fifth point.
   assert(next.earnedEXP===1 && next.levelUps===1 && s.currentEXP===0 && s.capacity===17);
 });
+
+test('empty-wallet bonus stacks with exact, preserves PT, and excludes already empty wallets', () => {
+  const s=T.createGame({...WALLET_CONFIG,coins:{500:0,100:1,50:0,10:0,5:0,1:0},emptyCapacityBonus:5});s.currentEXP=3;
+  T.add(s,100);const before=JSON.stringify(s),p=T.previewPayment(s,{price:100});
+  assert(JSON.stringify(s)===before&&p.emptyBonus===5&&p.exactBonus===2&&p.capacityAfter===22&&p.wear===0);
+  T.pay(s,{price:100});assert(s.capacity===22&&s.currentEXP===3&&s.level===1);
+  T.add(s,1000,true);const next=T.pay(s,{price:1000});assert(!next.emptied&&next.emptyBonus===0&&s.capacity===24);
+});
+test('empty-wallet bonus stacks with normal PT growth for banknote change', () => {
+  const s=T.createGame({...WALLET_CONFIG,coins:{500:0,100:1,50:0,10:0,5:0,1:0},emptyCapacityBonus:5});s.currentEXP=4;
+  T.add(s,100);T.add(s,1000,true);const p=T.pay(s,{price:100});
+  assert(!p.exact&&p.emptyBonus===5&&p.earnedEXP===1&&p.levelUps===1&&s.capacity===21&&s.currentEXP===0&&p.wear===0);
+});
+test('temporary empty wallet while inserting coins does not earn empty bonus', () => {
+  const s=T.createGame({...WALLET_CONFIG,coins:{500:0,100:1,50:0,10:0,5:0,1:0},emptyCapacityBonus:5});
+  T.add(s,100);assert(T.count(s.wallet)===0);
+  const p=T.pay(s,{price:99});assert(!p.emptied&&p.emptyBonus===0&&T.count(s.wallet)===1);
+});
+
+test('receipt achievement counters count committed checkouts and reset on new game', () => {
+  const config={...WALLET_CONFIG,coins:{500:0,100:1,50:0,10:0,5:0,1:0},emptyCapacityBonus:5};
+  const s=T.createGame(config);assert(s.exactCount===0&&s.emptyCount===0);
+  T.add(s,100);T.previewPayment(s,{price:100});assert(s.exactCount===0&&s.emptyCount===0);
+  T.pay(s,{price:100});assert(s.exactCount===1&&s.emptyCount===1);
+  T.add(s,1000,true);T.pay(s,{price:1000});assert(s.exactCount===2&&s.emptyCount===1);
+  T.add(s,1000,true);T.pay(s,{price:900});assert(s.exactCount===2&&s.emptyCount===1);
+  T.add(s,100);T.add(s,1000,true);T.pay(s,{price:100});assert(s.exactCount===2&&s.emptyCount===2);
+  assert(T.pay(s,{price:100})===null&&s.exactCount===2&&s.emptyCount===2);
+  const fresh=T.createGame(config);assert(fresh.exactCount===0&&fresh.emptyCount===0);
+});
+
+test('capacity breakthrough resets coins and capacity, preserves progress and repeats', () => {
+  const s=T.createGame({...WALLET_CONFIG,coins:{500:0,100:1,50:0,10:0,5:0,1:0},maxCoinsCapacity:48,emptyCapacityBonus:5});
+  s.currentEXP=3;T.add(s,1000,true);
+  const before=JSON.stringify(s),p=T.previewPayment(s,{price:1000});
+  assert(JSON.stringify(s)===before&&p.breakthrough&&p.capacityBeforeBreakthrough===50&&p.capacityAfter===20&&p.after===0&&!p.over);
+  T.pay(s,{price:1000});
+  assert(s.goldCards===1&&s.capacity===20&&T.count(s.wallet)===0&&s.currentEXP===3&&s.total===1000&&s.purchases.length===1);
+  assert(s.exactCount===1&&s.emptyCount===0&&s.notes[1000]===null);
+  s.capacity=49;T.add(s,1000,true);const next=T.pay(s,{price:1000});
+  assert(next.capacityBeforeBreakthrough===51&&s.goldCards===2&&s.capacity===20&&s.total===2000&&!s.over);
+  assert(T.createGame(WALLET_CONFIG).goldCards===0);
+});
+test('below threshold does not reset and PT growth can trigger breakthrough', () => {
+  const s=T.createGame({...WALLET_CONFIG,maxCoinsCapacity:47});T.add(s,1000,true);T.pay(s,{price:1000});
+  assert(s.capacity===49&&s.goldCards===0&&T.count(s.wallet)===8);
+  const full=T.createGame({...WALLET_CONFIG,maxCoinsCapacity:49,coins:{500:0,100:0,50:0,10:0,5:0,1:49},levelCapacityBonus:1});
+  full.currentEXP=4;T.add(full,1);T.add(full,1000,true);
+  const p=T.pay(full,{price:1});assert(p.breakthrough&&p.after===0&&full.capacity===20&&full.goldCards===1&&!full.over);
+});

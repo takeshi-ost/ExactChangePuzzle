@@ -39,11 +39,11 @@
     if (!Number.isSafeInteger(capacity) || capacity < 1) fail('maxCoinsCapacityは1以上の整数にしてください。');
     if (count(config.coins) > capacity) fail('初期硬貨の合計枚数が上限を超えています。');
     const rules = {};
-    for (const [key, minimum] of Object.entries({levelCapacityBonus:0, exactCapacityBonus:0})) {
+    for (const [key, minimum] of Object.entries({levelCapacityBonus:0, exactCapacityBonus:0, emptyCapacityBonus:0})) {
       if (!Number.isSafeInteger(config[key]) || config[key] < minimum) fail(`${key}は${minimum}以上の整数にしてください。`);
       rules[key] = config[key];
     }
-    return {wallet:{...config.coins}, notes:{...config.notes}, capacity, tray:[], total:0, purchases:[], over:false,
+    return {wallet:{...config.coins}, notes:{...config.notes}, capacity, tray:[], total:0, purchases:[], over:false, exactCount:0, emptyCount:0, goldCards:0,
       level:1, currentEXP:0, nextLevelEXP:LEVEL_EXP, wearTurns:0, rules};
   }
   function changeNotes(amount) {
@@ -99,7 +99,7 @@
     const returned = changeCoins(change);
     const spentCoins = state.tray.filter(money => !money.note).length;
     const changeCount = count(returned);
-    const after = count(state.wallet) + changeCount;
+    let after = count(state.wallet) + changeCount;
     // Coins in the tray still belong to the pre-payment wallet.
     const exact = change === 0;
     const earnedEXP = exact ? 0 : Math.max(0, spentCoins - changeCount);
@@ -111,17 +111,24 @@
       currentEXP %= nextLevelEXP;
       level += levelUps;
     }
+    const emptied = after === 0 && spentCoins > 0;
+    const emptyBonus = emptied ? state.rules.emptyCapacityBonus : 0;
     const exactBonus = exact ? state.rules.exactCapacityBonus : 0;
     const levelCapacityGain = levelUps * state.rules.levelCapacityBonus;
     const turn = state.purchases.length + 1;
     const wearTurns = state.wearTurns + 1;
-    const grownCapacity = state.capacity + levelCapacityGain + exactBonus;
+    const grownCapacity = state.capacity + levelCapacityGain + exactBonus + emptyBonus;
     // Capacity growth protects the wallet from wear for this checkout.
-    const wear = levelCapacityGain > 0 || exactBonus > 0 ? 0 : 1;
-    const capacityAfter = grownCapacity - wear;
-    return {change, returned, returnedNotes: changeNotes(change), banknoteAmount: change - change % 1000, changeCount, delta: changeCount - spentCoins,
-      after, exact, earnedEXP, currentEXP, nextLevelEXP, level, levelUps, levelCapacityGain, exactBonus, wear, wearTurns, turn, capacityAfter,
-      upgraded: levelUps > 0 || exactBonus > 0, over: capacityAfter <= 0 || after > capacityAfter};
+    const wear = levelCapacityGain > 0 || exactBonus > 0 || emptyBonus > 0 ? 0 : 1;
+    const capacityBeforeBreakthrough = grownCapacity - wear;
+    const breakthrough = capacityBeforeBreakthrough >= 50;
+    const walletBeforeBreakthrough = breakthrough
+      ? Object.fromEntries(denominations.map(v => [v, state.wallet[v] + returned[v]])) : null;
+    const capacityAfter = breakthrough ? 20 : capacityBeforeBreakthrough;
+    if (breakthrough) after = 0;
+    return {change, returned, returnedNotes: changeNotes(change), banknoteAmount: change - change % 1000, changeCount, delta: after - count(state.wallet) - spentCoins,
+      after, breakthrough, capacityBeforeBreakthrough, walletBeforeBreakthrough, exact, emptied, emptyBonus, earnedEXP, currentEXP, nextLevelEXP, level, levelUps, levelCapacityGain, exactBonus, wear, wearTurns, turn, capacityAfter,
+      upgraded: levelUps > 0 || exactBonus > 0 || emptyBonus > 0, over: capacityAfter <= 0 || after > capacityAfter};
   }
   function pay(state, product) {
     const preview = previewPayment(state, product);
@@ -131,7 +138,13 @@
     for (const value of noteDenominations) {
       if (state.notes[value] !== null) state.notes[value] += preview.returnedNotes[value];
     }
+    state.exactCount += Number(preview.exact);
+    state.emptyCount += Number(preview.emptied);
     state.tray = []; state.total += product.price; state.purchases.push(product);
+    if (preview.breakthrough) {
+      state.wallet = changeCoins(0);
+      state.goldCards++;
+    }
     state.capacity = preview.capacityAfter;
     state.currentEXP = preview.currentEXP; state.nextLevelEXP = preview.nextLevelEXP; state.level = preview.level;
     state.wearTurns = preview.wearTurns;

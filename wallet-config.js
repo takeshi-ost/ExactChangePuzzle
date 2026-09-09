@@ -19,5 +19,6 @@ globalThis.WALLET_CONFIG = {
   },
   maxCoinsCapacity: 20,
   levelCapacityBonus: 1, // レベルアップ1回で増える容量（0以上の整数）
+  emptyCapacityBonus: 5, // 持っていた小銭を使い切った会計の容量ボーナス
   exactCapacityBonus: 2, // お釣り0円のピッタリ支払いで増える容量（0以上の整数）
 };

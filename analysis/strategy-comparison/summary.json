@@ -1,0 +1,75 @@
+{
+  "smart": {
+    "runs": 10000,
+    "finished": 10000,
+    "censored": 0,
+    "censored_rate": 0.0,
+    "observed_mean_turns": 26.792,
+    "observed_mean_total": 30539.3318,
+    "finished_mean_turns": 26.792,
+    "finished_mean_total": 30539.3318,
+    "survivor_mean_capacity": null,
+    "survivor_mean_coins": null,
+    "max_capacity": 14,
+    "exact_rate": 0.10733054643177067,
+    "empty_wallet_count": 363,
+    "survival": {
+      "10": 0.9621,
+      "20": 0.5642,
+      "50": 0.0778,
+      "100": 0.0073,
+      "250": 0.0,
+      "500": 0.0,
+      "1000": 0.0
+    },
+    "max_turns": 171,
+    "gold_card_total": 0,
+    "gold_card_bins": {
+      "0": 10000
+    },
+    "breakthrough_runs": 0,
+    "breakthrough_rate": 0.0,
+    "repeat_breakthrough_runs": 0,
+    "repeat_given_first_rate": null,
+    "mean_first_breakthrough": null,
+    "mean_turns_after_last_reset": null
+  },
+  "balanced": {
+    "runs": 10000,
+    "finished": 10000,
+    "censored": 0,
+    "censored_rate": 0.0,
+    "observed_mean_turns": 19.4391,
+    "observed_mean_total": 22291.0366,
+    "finished_mean_turns": 19.4391,
+    "finished_mean_total": 22291.0366,
+    "survivor_mean_capacity": null,
+    "survivor_mean_coins": null,
+    "max_capacity": 48,
+    "exact_rate": 0.15398346631274082,
+    "empty_wallet_count": 475,
+    "survival": {
+      "10": 0.7933,
+      "20": 0.3514,
+      "50": 0.0292,
+      "100": 0.0016,
+      "250": 0.0,
+      "500": 0.0,
+      "1000": 0.0
+    },
+    "max_turns": 184,
+    "gold_card_total": 201,
+    "gold_card_bins": {
+      "0": 9811,
+      "1": 178,
+      "2": 10,
+      "3": 1
+    },
+    "breakthrough_runs": 189,
+    "breakthrough_rate": 0.0189,
+    "repeat_breakthrough_runs": 11,
+    "repeat_given_first_rate": 0.0582010582010582,
+    "mean_first_breakthrough": 63.22222222222222,
+    "mean_turns_after_last_reset": 8.677248677248677
+  }
+}
