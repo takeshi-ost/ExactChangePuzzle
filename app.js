@@ -23,6 +23,11 @@ const productContent = document.createElement('div');
 productContent.className = 'product-content';
 productContent.append(...productPanel.childNodes);
 productPanel.append(productContent);
+const shopScene = document.createElement('div');
+shopScene.className = 'shop-scene'; shopScene.setAttribute('aria-hidden', 'true');
+const cashierFace = document.createElement('div'); cashierFace.className = 'cashier-face';
+shopScene.append(cashierFace); productPanel.prepend(shopScene);
+
 const growth = document.createElement('div');
 growth.className = 'growth';
 growth.innerHTML = '<div id="exp-indicator" role="progressbar" aria-label="次の上限拡張までのポイント" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0">' + '<span aria-hidden="true"></span>'.repeat(5) + '</div>';
@@ -112,6 +117,7 @@ async function lightPoints(from, to, paymentState) {
   }
 }
 function renderProduct() {
+  productPanel.dataset.expression = 'idle';
   $('art').textContent = current.emoji; $('art').style.background = current.color;
   $('item-name').textContent = current.name; $('category').textContent = current.category;
   $('description').textContent = current.description; $('price').textContent = yen(current.price);
@@ -198,7 +204,7 @@ function showResult() {
 function burst() {
   $('wallet').classList.add('burst'); se('burst');
   const box = $('wallet').getBoundingClientRect();
-  for (let i = 0; i < 18; i++) { const coin = document.createElement('span'); coin.className = 'flying-coin'; coin.textContent = '🪙'; coin.style.left = `${box.left + box.width / 2}px`; coin.style.top = `${box.top + 50}px`; coin.style.setProperty('--dx', `${(Math.random() - .5) * 450}px`); coin.style.setProperty('--dy', `${-80 - Math.random() * 300}px`); document.body.append(coin); setTimeout(() => coin.remove(), 1100); }
+  for (let i = 0; i < 18; i++) { const coin = document.createElement('span'); coin.className = 'flying-coin'; coin.dataset.value = G.denominations[i % G.denominations.length]; coin.style.left = `${box.left + box.width / 2}px`; coin.style.top = `${box.top + 50}px`; coin.style.setProperty('--dx', `${(Math.random() - .5) * 450}px`); coin.style.setProperty('--dy', `${-80 - Math.random() * 300}px`); document.body.append(coin); setTimeout(() => coin.remove(), 1100); }
 }
 function makeTrayMoney(money, index) {
   const button = document.createElement('button');
@@ -296,6 +302,7 @@ $('pay').onclick = async () => {
   if (busy) return;
   const before = {...state, wallet:{...state.wallet}, notes:{...state.notes}, purchases:[...state.purchases]};
   const result = G.pay(state, current); if (!result) return; busy = true;
+  productPanel.dataset.expression = 'smile';
   const paymentState = state, startingEXP = before.currentEXP; walletDisplay = before;
   const rewardDisplay = {...state, wallet:result.walletBeforeBreakthrough || state.wallet, goldCards:before.goldCards};
   if (state.total > best) { best = state.total; try { localStorage.setItem('kozeni-best', String(best)); } catch {} }

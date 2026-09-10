@@ -123,6 +123,14 @@ test('UI payment, receipt and restart preserve generated price and reset capacit
 });
 async function testAsync(name, fn) {totalTests++;try {await fn(); out.textContent+='PASS '+name+'\n'; passed++;} catch(e) {out.textContent+='FAIL '+name+': '+e.message+'\n';}}
 (async () => {
+ await testAsync('cashier smiles only after valid payment and resets for next product or restart', async()=>{
+  $('restart').click();current={...G.products[0],price:1000};render();
+  assert(productPanel.dataset.expression==='idle');await $('pay').onclick();assert(productPanel.dataset.expression==='idle');
+  add(1000,true);const pending=$('pay').onclick();assert(productPanel.dataset.expression==='smile');
+  await pending;assert(productPanel.dataset.expression==='idle');
+  current={...G.products[0],price:1000};add(1000,true);const interrupted=$('pay').onclick();
+  assert(productPanel.dataset.expression==='smile');$('restart').click();await interrupted;assert(productPanel.dataset.expression==='idle');
+ });
  await testAsync('5000 note UI returns exactly one note and credits received change',async()=>{
   $('restart').click();state=G.createGame({...WALLET_CONFIG,notes:{1000:0,5000:1,10000:1}});current={...G.products[0],price:3999};renderProduct();render();
   const five=document.querySelector('[data-note="5000"]');five.click();assert(five.disabled&&five.querySelector('b').textContent==='×0');
