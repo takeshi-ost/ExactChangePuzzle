@@ -1,0 +1,34 @@
+﻿/* Fit the 3:5 composition inside the safe viewport at every resolution. */
+:root {
+  --viewport-height:100vh;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-right:env(safe-area-inset-right,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-left:env(safe-area-inset-left,0px);
+  --frame-gap:min(2vw,2vh);
+  --available-width:calc(100vw - var(--safe-left) - var(--safe-right) - 2 * var(--frame-gap));
+  --available-height:calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - 2 * var(--frame-gap));
+  --game-width:min(var(--available-width),calc(var(--available-height) * 3 / 5));
+  --u:calc(var(--game-width) / 360);
+}
+@supports(height:100svh) {
+  :root{--viewport-height:100svh;--frame-gap:min(2vw,2svh)}
+}
+body {
+  min-height:var(--viewport-height);
+  padding:calc(var(--safe-top) + var(--frame-gap)) calc(var(--safe-right) + var(--frame-gap)) calc(var(--safe-bottom) + var(--frame-gap)) calc(var(--safe-left) + var(--frame-gap));
+  display:grid;
+  place-items:center;
+}
+.game {
+  width:var(--game-width);
+  max-width:none;
+  height:auto;
+  min-height:0;
+  aspect-ratio:3 / 5;
+  grid-template-rows:minmax(0,44fr) minmax(0,188fr) minmax(0,154fr) minmax(0,214fr);
+  margin:0;
+}
+.collection{height:auto;min-height:0}
+#toast{bottom:calc(var(--safe-bottom) + var(--frame-gap));max-width:var(--available-width)}
+dialog{max-width:min(90%,calc(390 * var(--u)));max-height:var(--available-height)}
