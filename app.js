@@ -14,7 +14,8 @@ function startGame(event) {
   document.removeEventListener('click', startGame, true);
   document.removeEventListener('keydown', startGame, true);
   renderProduct();
-  document.getElementById('sound').focus({preventScroll:true});
+  // Keep keyboard navigation available without focusing sound after a tap.
+  if (event.type === 'keydown') document.getElementById('sound').focus({preventScroll:true});
 }
 if (titleScreen) {
   document.addEventListener('click', startGame, true);
@@ -139,10 +140,10 @@ async function slideProduct(entering) {
   try { await Promise.race([animation.finished, pause(duration + 100)]); }
   catch {} finally { if (productAnimation === animation) { animation.cancel(); productAnimation = null; } }
 }
-async function showPoints(points, exact = false, paymentState = state, label = '') {
-  if (!label && !exact && points <= 0) return;
+async function showPoints(points, paymentState = state, label = '') {
+  if (!label && points <= 0) return;
   const el = document.createElement('div'); el.className = 'point-popup';
-  el.textContent = label || (exact ? 'ぴったり！' : `${points}枚へった！`); el.setAttribute('role', 'status');
+  el.textContent = label || `${points}枚へった！`; el.setAttribute('role', 'status');
   document.querySelector('.payment').append(el);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const from = el.getBoundingClientRect(), target = $('exp-indicator').getBoundingClientRect();
@@ -153,7 +154,7 @@ async function showPoints(points, exact = false, paymentState = state, label = '
     {opacity:0, transform:'translate(-50%, 12px) scale(.65)'},
     {opacity:1, transform:'translate(-50%, -4px) scale(1.12)', offset:.2},
     {opacity:1, transform:'translate(-50%, -12px) scale(1)', offset:.7},
-    {opacity:0, transform:exact ? 'translate(-50%, -32px) scale(1)' : `translate(calc(-50% + ${dx}px), ${dy}px) scale(.05)`}
+    {opacity:0, transform:label ? 'translate(-50%, -32px) scale(1)' : `translate(calc(-50% + ${dx}px), ${dy}px) scale(.05)`}
   ], {duration, easing:'ease-out', fill:'both'});
   const entry = {el, animation}; pointPopups.add(entry);
   try { await Promise.race([animation.finished, pause(duration + 100)]); }
@@ -315,10 +316,9 @@ async function animateChange(result, paymentState) {
   });
   $('tray-items').replaceChildren(...pieces);
   layoutTray();
-  if (!pieces.length) $('tray-items').innerHTML = '<span class="tray-hint">お釣りなし ✨</span>';
   const pointsAnimation = result.emptyBonus > 0
-    ? showPoints(0, true, paymentState, 'からっぽ！！')
-    : showPoints(result.earnedEXP, result.change === 0, paymentState);
+    ? showPoints(0, paymentState, 'からっぽ！！')
+    : result.exact ? Promise.resolve() : showPoints(result.earnedEXP, paymentState);
   await pause(money.length ? 650 : 350);
   if (state !== paymentState) return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -384,7 +384,7 @@ $('pay').onclick = async () => {
       if (state !== paymentState) return;
     }
     capacityBase += result.emptyBonus;
-    await showPoints(result.earnedEXP, result.exact, paymentState);
+    if (!result.exact) await showPoints(result.earnedEXP, paymentState);
     if (state !== paymentState) return;
     if (!result.exact) {
       await lightPoints(0, startingEXP, paymentState);
@@ -435,7 +435,7 @@ $('pay').onclick = async () => {
   if (result.breakthrough) {
     walletDisplay = {...rewardDisplay, currentEXP:state.currentEXP, capacity:result.capacityBeforeBreakthrough};
     render();
-    await showPoints(0, true, paymentState, '上限突破！！');
+    await showPoints(0, paymentState, '上限突破！！');
     if (state !== paymentState) return;
   }
   walletDisplay = null;
