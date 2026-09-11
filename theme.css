@@ -1,13 +1,13 @@
 /* Illustrated shop skin. Layout and all hit targets remain real HTML controls. */
 :root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif}
-body{background:#bda185 url('assets/art/shop-stylized.png') center/cover fixed;color:#30271f}
+body{background:#bda185 url('assets/art/shop-background.png') center/cover fixed;color:#30271f}
 body::before{content:'';position:fixed;inset:0;background:#37271655;backdrop-filter:blur(12px);z-index:-1}
 .game{height:clamp(calc(650 * var(--u)),calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px),calc(720 * var(--u)));grid-template-rows:calc(32 * var(--u)) calc(44 * var(--u)) minmax(calc(180 * var(--u)),1fr) calc(156 * var(--u)) calc(230 * var(--u));border-radius:calc(18 * var(--u));background:#f3d3a3;box-shadow:0 16px 70px #25180a60;overflow:hidden}
 .game>header{background:#fffaf0;border-bottom:1px solid #dfd1bd;padding:0 calc(12 * var(--u))}
 .brand{font-size:calc(13 * var(--u));color:#294439}.brand span{display:none}.header-actions #sound{font-size:calc(10 * var(--u))}.header-actions button{width:calc(26 * var(--u));height:calc(26 * var(--u));background:#fffdf7}
 .collection{margin:0;padding:calc(3 * var(--u)) calc(13 * var(--u));border:0;background:#fffaf0;box-shadow:0 2px 4px #69543b30;z-index:1}
 .score{display:grid;grid-template-columns:auto 1fr;gap:0 calc(10 * var(--u));align-items:center;padding:0}.score>span{font-size:calc(10 * var(--u));font-weight:700}.score strong{font-size:calc(26 * var(--u));color:#111f18}.score small{grid-column:1/-1;font-size:calc(8 * var(--u));color:#776a57}.best{color:#776a57}.shelf-label{display:none}
-.product{position:relative;background:#dbb98b url('assets/art/shop-stylized.png') center 36%/cover no-repeat;padding:calc(10 * var(--u));align-items:flex-end;justify-content:center}
+.product{position:relative;background:#dbb98b url('assets/art/shop-background.png') center 36%/cover no-repeat;padding:calc(10 * var(--u));align-items:flex-end;justify-content:center}
 .product-content{position:relative;width:48%;height:auto;min-height:calc(105 * var(--u));max-height:100%;padding:calc(12 * var(--u)) calc(10 * var(--u));gap:calc(8 * var(--u));background:#fffefa;border-radius:42% 42% 38% 20%;box-shadow:0 4px 16px #684c2925;justify-content:center}
 .product-content::after{content:'';position:absolute;left:calc(-8 * var(--u));bottom:18%;width:calc(20 * var(--u));height:calc(18 * var(--u));background:#fffefa;clip-path:polygon(100% 0,100% 100%,0 100%)}
 .product .product-art{display:none}.product h1{font-size:calc(12 * var(--u));font-weight:800;line-height:1.5;overflow-wrap:anywhere}.product .price{font-size:calc(28 * var(--u));color:#063e2b;letter-spacing:-1px;white-space:nowrap}
@@ -48,9 +48,20 @@ body::before{content:'';position:fixed;inset:0;background:#37271655;backdrop-fil
 /* One continuous counter beneath scene, tray, and the wallet's rounded corners. */
 .game{--tray-height:calc(112 * var(--u));background:#dba452 url('assets/art/counter.jpg') center bottom/100% auto repeat-y;height:clamp(calc(700 * var(--u)),calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px),calc(760 * var(--u)));grid-template-rows:calc(32 * var(--u)) calc(44 * var(--u)) minmax(calc(180 * var(--u)),1fr) calc(204 * var(--u)) calc(230 * var(--u))}
 .product{background:transparent;isolation:isolate}
-.shop-scene{position:absolute;left:0;top:0;width:100%;height:113%;background:url('assets/art/shop-stylized.png') center top/100% 100% no-repeat;pointer-events:none;z-index:-1}
-.cashier-face{opacity:0;position:absolute;inset:0;background:url('assets/art/cashier-stylized-smile.png') center top/100% 100% no-repeat;mask-image:radial-gradient(ellipse 13% 20% at 28% 34%,#000 86%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 13% 20% at 28% 34%,#000 86%,transparent 100%)}
-.product[data-expression="smile"] .cashier-face{opacity:1}
+.shop-scene{position:absolute;left:0;top:0;width:100%;height:113%;background:url('assets/art/shop-background.png') center top/100% 100% no-repeat;pointer-events:none;z-index:-1}
+.cashier-sprite{opacity:0;position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}
+/* Align face and shoulder centers with idle; percentages scale with the scene. */
+.cashier-smile{transform:translate(2%,-6%)}
+.cashier-surprise{transform:translate(2%,-5.5%)}
+.product[data-expression="idle"] .cashier-idle,
+.product[data-expression="smile"] .cashier-smile,
+.product[data-expression="surprise"] .cashier-surprise{opacity:1}
+/* Only the two eye regions change; the original idle sprite stays underneath. */
+.cashier-blink{mask-image:radial-gradient(ellipse 5.5% 8% at 21.7% 28.5%,#000 85%,transparent 100%),radial-gradient(ellipse 5.5% 8% at 35.2% 35.5%,#000 85%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 5.5% 8% at 21.7% 28.5%,#000 85%,transparent 100%),radial-gradient(ellipse 5.5% 8% at 35.2% 35.5%,#000 85%,transparent 100%)}
+.product[data-expression="idle"][data-blink="closed"] .cashier-blink{opacity:1}
+.cashier-comment{display:none;margin:0;font-size:calc(15 * var(--u));font-weight:700;line-height:1.6;text-align:center;overflow-wrap:anywhere;color:#493c2c}
+.product[data-comment] .product-content>:not(.cashier-comment){display:none}
+.product[data-comment] .cashier-comment{display:block}
 .payment{background:none;box-shadow:none;padding-top:calc(8 * var(--u))}
 .tray{flex:0 0 auto;isolation:isolate}
 .tray::before{content:'';position:absolute;left:0;right:0;top:0;height:var(--tray-height);background:url('assets/art/tray.jpg') center/100% 100% no-repeat;clip-path:polygon(8% 6%,92% 6%,95% 8%,97% 16%,99% 73%,98% 81%,96% 87%,4% 87%,2% 82%,1% 74%,3% 17%,5% 9%);pointer-events:none;z-index:-1}
@@ -78,7 +89,8 @@ body{min-height:100svh;padding-top:calc(var(--browser-gap) + var(--safe-top));pa
 
 /* Shorter speech bubble above a separate, animated product illustration. */
 .product .product-content{position:absolute;top:calc(6 * var(--u));right:calc(10 * var(--u));width:48%;height:calc(84 * var(--u));min-height:0;max-height:none;padding:calc(6 * var(--u)) calc(8 * var(--u));gap:calc(4 * var(--u));justify-content:center}
-.product h1{font-size:calc(11 * var(--u));line-height:1.35}
+.product h1,.product .cashier-comment{font-size:calc(11 * var(--u));line-height:1.35;font-weight:800;color:inherit}
+.product .cashier-comment{margin:0}
 .product .price{font-size:calc(25 * var(--u));line-height:1.1}
 .product #art{display:grid;place-items:center;position:absolute;right:calc(10 * var(--u));bottom:calc(2 * var(--u));width:48%;height:calc(90 * var(--u));margin:0;border-radius:0;background:transparent;font-size:calc(80 * var(--u));line-height:1;text-shadow:0 5px 7px #39271033;pointer-events:none}
 .product #art::after{display:none}
@@ -97,3 +109,24 @@ body{min-height:100svh;padding-top:calc(var(--browser-gap) + var(--safe-top));pa
 .notes button[data-note]>span:nth-child(2){top:auto;bottom:12%;left:7%;font-size:calc(12 * var(--u))}
 .notes button[data-note] b{top:9%;right:7%;font-size:calc(18 * var(--u));max-width:45%;overflow-wrap:anywhere}
 .score .header-actions{pointer-events:auto}
+
+/* Empty holdings are distinct from temporary input locks during checkout. */
+.coin-slot[data-empty="true"] .coin-stack{filter:brightness(.32) saturate(.2);opacity:.7}
+.coin-slot[data-empty="true"] .coin-count{color:#9a8877}
+/* One icon per earned card, aligned with the purchase count. */
+.result-summary{display:flex;align-items:center;gap:10px;margin:12px 0}
+.result-summary #result-count{margin:0 0 0 auto;flex-shrink:0;white-space:nowrap}
+.result-gold{display:flex;align-items:center;justify-content:flex-start;gap:4px;min-width:0;overflow-x:auto;padding:3px 0}
+.result-gold[hidden]{display:none}
+.result-gold-card{flex:0 0 28px;width:28px;height:18px;border:1px solid #a5751c;border-radius:3px;background:linear-gradient(135deg,#fff3b6,#e4bf59 45%,#b47e22);box-shadow:0 1px 2px #53391055;display:grid;place-items:center;color:#8c6418;font-size:11px;line-height:1}
+
+/* One full-viewport hit target prevents the start tap reaching the game. */
+.title-screen{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:calc(var(--safe-top) + var(--frame-gap)) calc(var(--safe-right) + var(--frame-gap)) calc(var(--safe-bottom) + var(--frame-gap)) calc(var(--safe-left) + var(--frame-gap));background:#231b1666;cursor:pointer;touch-action:manipulation}
+.title-plate{box-sizing:border-box;width:calc(320 * var(--u));max-width:100%;padding:calc(23 * var(--u)) calc(17 * var(--u));text-align:center;border:calc(3 * var(--u)) solid #ba8c42;border-radius:calc(20 * var(--u));background:linear-gradient(135deg,#fffaf0,#f7e6c1);box-shadow:0 calc(12 * var(--u)) calc(35 * var(--u)) #21160c66,inset 0 0 0 calc(5 * var(--u)) #fff9ec;color:#374b37;pointer-events:none}
+.title-emblem{font-size:calc(26 * var(--u));color:#a57b2e}
+.title-plate h2{margin:calc(8 * var(--u)) 0 calc(18 * var(--u));font-size:calc(31 * var(--u));line-height:1.2;font-weight:900;letter-spacing:.03em}
+.title-plate h2 span{font-size:calc(37 * var(--u))}
+.title-rules p{font-size:calc(12 * var(--u));line-height:1.7;margin:calc(8 * var(--u)) 0;color:#625442}
+.title-start{display:block;margin:calc(20 * var(--u)) 0 calc(8 * var(--u));padding:calc(12 * var(--u));border-radius:calc(10 * var(--u));background:#35674b;color:#fff9e9;font-size:calc(18 * var(--u))}
+.title-plate small{font-size:calc(9 * var(--u));color:#81705a}
+.title-screen:focus-visible .title-plate{outline:3px solid #e5b54e;outline-offset:4px}

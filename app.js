@@ -1,5 +1,26 @@
 'use strict';
 const G = CoinGame;
+const titleScreen = document.getElementById('title-screen');
+let started = !titleScreen;
+const gameScreen = document.querySelector('.game');
+gameScreen.inert = !started;
+function startGame(event) {
+  if (started) return;
+  if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  started = true;
+  titleScreen.remove();
+  gameScreen.inert = false;
+  document.removeEventListener('click', startGame, true);
+  document.removeEventListener('keydown', startGame, true);
+  renderProduct();
+  document.getElementById('sound').focus({preventScroll:true});
+}
+if (titleScreen) {
+  document.addEventListener('click', startGame, true);
+  document.addEventListener('keydown', startGame, true);
+  titleScreen.focus({preventScroll:true});
+}
 const $ = id => document.getElementById(id);
 const yen = n => `¥${n.toLocaleString('ja-JP')}`;
 function initialGame() {
@@ -25,10 +46,42 @@ productContent.append(...productPanel.childNodes);
 productPanel.append(productContent);
 const productArt = $('art');
 productPanel.append(productArt);
+const cashierComment = document.createElement('p');
+cashierComment.className = 'cashier-comment';
+cashierComment.setAttribute('role', 'status');
+productContent.append(cashierComment);
 const shopScene = document.createElement('div');
 shopScene.className = 'shop-scene'; shopScene.setAttribute('aria-hidden', 'true');
-const cashierFace = document.createElement('div'); cashierFace.className = 'cashier-face';
-shopScene.append(cashierFace); productPanel.prepend(shopScene);
+for (const expression of ['idle', 'smile', 'surprise']) {
+  const sprite = document.createElement('img');
+  sprite.className = `cashier-sprite cashier-${expression}`;
+  sprite.src = `assets/art/cashier-${expression}-sprite.png`;
+  sprite.alt = ''; sprite.draggable = false;
+  shopScene.append(sprite);
+}
+productPanel.prepend(shopScene);
+const blinkSprite = document.createElement('img');
+blinkSprite.className = 'cashier-sprite cashier-blink';
+blinkSprite.alt = ''; blinkSprite.draggable = false;
+let blinkTimer, blinkReady = false;
+function stopBlink() {
+  clearTimeout(blinkTimer);
+  delete productPanel.dataset.blink;
+}
+function scheduleBlink() {
+  stopBlink();
+  if (!blinkReady || document.hidden || state.over || productPanel.dataset.expression !== 'idle') return;
+  blinkTimer = setTimeout(() => {
+    if (document.hidden || state.over || productPanel.dataset.expression !== 'idle') return;
+    productPanel.dataset.blink = 'closed';
+    blinkTimer = setTimeout(scheduleBlink, 140);
+  }, 2500 + Math.random() * 3500);
+}
+blinkSprite.onload = () => { blinkReady = true; scheduleBlink(); };
+blinkSprite.onerror = () => { blinkReady = false; stopBlink(); };
+blinkSprite.src = 'assets/art/cashier-idle-blink.png';
+shopScene.append(blinkSprite);
+document.addEventListener('visibilitychange', scheduleBlink);
 
 const growth = document.createElement('div');
 growth.className = 'growth';
@@ -116,11 +169,14 @@ async function lightPoints(from, to, paymentState) {
   }
 }
 function renderProduct() {
+  delete productPanel.dataset.comment;
+  cashierComment.textContent = '';
   productPanel.dataset.expression = 'idle';
+  scheduleBlink();
   productArt.textContent = current.emoji;
   $('item-name').textContent = current.name; $('category').textContent = current.category;
   $('description').textContent = current.description; $('price').textContent = yen(current.price);
-  void slideProduct(true);
+  if (started) void slideProduct(true);
 }
 function render() {
   const visibleWallet = walletDisplay?.wallet || state.wallet;
@@ -136,7 +192,7 @@ function render() {
   $('coin-total').textContent = `${count}枚`;
   $('coins').replaceChildren(...G.denominations.map(value => {
     const n = visibleWallet[value], button = document.createElement('button');
-    button.className = 'coin-slot'; button.dataset.value = value; button.disabled = busy || state.over || !n;
+    button.className = 'coin-slot'; button.dataset.empty = String(n === 0); button.dataset.value = value; button.disabled = busy || state.over || !n;
     button.setAttribute('aria-label', `${value}円玉、残り${n}枚。1枚投入`);
     button.innerHTML = `<span class="coin-stack">${Array.from({length:Math.min(4, Math.max(1,n))}, (_,i) => `<span class="coin-face" style="--offset:${(Math.min(4, Math.max(1,n))-i-1)*3}px">${value}</span>`).join('')}</span><span class="coin-count">× ${n}</span>`;
     let startY, swiped = false;
@@ -166,13 +222,27 @@ function render() {
     b.disabled = busy || state.over || n === 0;
   });
 }
-function add(value, note = false) { if (busy || !G.add(state, value, note)) return; se(note ? 'note' : 'coin', state.wallet[value] || 1); render(); }
+function add(value, note = false) { if (!started || busy || !G.add(state, value, note)) return; se(note ? 'note' : 'coin', state.wallet[value] || 1); render(); }
 function nextProduct() {
   if (!bag.length) bag = [...G.products].sort(() => Math.random() - .5);
   if (bag.length > 1 && bag[bag.length - 1].name === current.name) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
   current = G.generateProduct(bag.pop(), state.purchases.length); renderProduct();
 }
+function renderResultGoldCards() {
+  const holder = $('result-gold');
+  const count = state.goldCards;
+  holder.setAttribute('aria-label', '獲得ゴールドカード ' + count + '枚');
+  holder.hidden = count === 0;
+  holder.replaceChildren();
+  for (let i = 0; i < count; i++) {
+    const card = document.createElement('span');
+    card.className = 'result-gold-card'; card.textContent = '★';
+    card.setAttribute('aria-hidden', 'true');
+    holder.append(card);
+  }
+}
 function showResult() {
+  renderResultGoldCards();
   $('result-exact').textContent = `ぴったり：${state.exactCount}回`;
   $('result-empty').textContent = `からっぽ：${state.emptyCount}回`;
   $('result-total').textContent = yen(state.total); $('result-count').textContent = `${state.purchases.length} 点のお買いもの`;
@@ -276,10 +346,13 @@ async function animateChange(result, paymentState) {
   })]);
 }
 $('pay').onclick = async () => {
-  if (busy) return;
+  if (!started || busy) return;
   const before = {...state, wallet:{...state.wallet}, notes:{...state.notes}, purchases:[...state.purchases]};
   const result = G.pay(state, current); if (!result) return; busy = true;
-  productPanel.dataset.expression = 'smile';
+  stopBlink();
+  productPanel.dataset.comment = CashierComments.category(result);
+  cashierComment.textContent = CashierComments.pick(result);
+  productPanel.dataset.expression = result.exact || result.emptied ? 'surprise' : 'smile';
   const paymentState = state, startingEXP = before.currentEXP; walletDisplay = before;
   const rewardDisplay = {...state, wallet:result.walletBeforeBreakthrough || state.wallet, goldCards:before.goldCards};
   if (state.total > best) { best = state.total; try { localStorage.setItem('kozeni-best', String(best)); } catch {} }

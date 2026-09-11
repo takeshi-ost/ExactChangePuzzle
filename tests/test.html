@@ -88,8 +88,23 @@ test('15-coin change fits capacity after wear and exact bonuses skip wear',()=>{
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <dialog id="help-dialog"><button class="close" data-close="help-dialog" aria-label="閉じる">×</button><span class="dialog-icon">◉</span><h2>小銭じょうずは、買いものじょうず。</h2><p>お財布のお金をじょうずに使って、ちょっと変な商品を買い続けよう。</p><ol><li>小銭やお札をタップしてトレイへ。</li><li>商品の金額以上を用意して「お会計」。</li><li>お釣りは千円単位をお札で、端数を最少枚数の硬貨で返します。</li></ol><p id="growth-rules">小銭を減らしてポイント獲得。ピッタリ支払いで財布を育てよう。</p><small>ヒント：198円に203円を出すと、お釣りは5円玉1枚。</small><button class="primary" data-close="help-dialog">お買いものをはじめる →</button></dialog>
-<dialog id="result"><div class="receipt"><span>小銭商店 / RECEIPT</span><h2>財布がパンクしました</h2><p>お買い上げ、ありがとうございました。</p><div id="receipt-items"></div><div class="receipt-total">合計 <strong id="result-total"></strong></div><p id="result-count"></p><p class="result-achievement" id="result-exact"></p><p class="result-achievement" id="result-empty"></p><div class="barcode" aria-hidden="true"></div><small>またのご来店を、お待ちしています。</small><button id="restart" class="primary">もう一度お買いもの →</button></div></dialog>
-</div><script src="../app.js"></script><script>
+<dialog id="result"><div class="receipt"><span>小銭商店 / RECEIPT</span><h2>財布がパンクしました</h2><p>お買い上げ、ありがとうございました。</p><div id="receipt-items"></div><div class="receipt-total">合計 <strong id="result-total"></strong></div><div class="result-summary"><span id="result-gold" class="result-gold" role="img" aria-label="獲得ゴールドカード" hidden></span><p id="result-count"></p></div><p class="result-achievement" id="result-exact"></p><p class="result-achievement" id="result-empty"></p><div class="barcode" aria-hidden="true"></div><small>またのご来店を、お待ちしています。</small><button id="restart" class="primary">もう一度お買いもの →</button></div></dialog>
+<div id="title-screen" class="title-screen" role="button" tabindex="0" aria-label="ピッタリ小銭パズルをスタート" aria-describedby="title-rules">
+  <div class="title-plate">
+    <span class="title-emblem" aria-hidden="true">◉</span>
+    <h2>ピッタリ<br><span>小銭パズル</span></h2>
+    <div id="title-rules" class="title-rules"><p>小銭とお札を選んで、お買いもの。</p><p>ピッタリ払って、お財布を育てよう。</p><p>小銭があふれるか、上限が0でおしまい。<br>お買いもの総額の記録に挑戦！</p></div>
+    <strong class="title-start">タップでスタート</strong>
+    <small>画面のどこをタップしてもはじまります</small>
+  </div>
+</div>
+</div><script src="../cashier-comments.js"></script><script src="../app.js"></script><script>
+test('title starts anywhere without forwarding first click',()=>{
+ assert(!started&&document.querySelector('.game').inert&&document.getElementById('title-screen'));
+ const initial=current, before=G.paid(state);document.getElementById('title-screen').click();
+ assert(started&&!document.querySelector('.game').inert&&!document.getElementById('title-screen'));
+ assert(G.paid(state)===before&&current===initial&&!sound);
+});
 test('initial product follows opening risk table',()=>{assert(current.riskLevel<=3);assert(G.riskLevel(current.price)===current.riskLevel);assert(state.capacity===15);});
 test('simplified UI separates limit and count and lists three notes in order',()=>{
  const main=document.querySelector('.game');
@@ -119,6 +134,19 @@ test('UI payment, receipt and restart preserve generated price and reset capacit
  document.querySelector('.coin-slot[data-value="100"]').click();document.querySelector('.coin-slot[data-value="100"]').click();
  $('pay').click();assert($('total').textContent==='¥198');assert($('pay').disabled);
  showResult();assert($('result').open);assert($('receipt-items').textContent.includes('¥198'));$('restart').click();assert($('total').textContent==='¥0');assert(!$('result').open);assert(state.capacity===15&&current.riskLevel<=3);
+});
+test('empty coin shading follows holdings rather than disabled controls',()=>{
+  const saved=state;state=G.createGame();render();
+  const coin=()=>document.querySelector('.coin-slot[data-value="500"]');
+  assert(coin().dataset.empty==='true');state.wallet[500]=1;busy=true;render();
+  assert(coin().disabled&&coin().dataset.empty==='false');busy=false;
+  G.add(state,500);render();assert(coin().dataset.empty==='true');
+  G.clear(state);render();assert(coin().dataset.empty==='false');state=saved;render();
+});
+test('result cards are outside receipt and show bounded stacks with actual totals',()=>{
+  const before=state.goldCards;
+  for(const n of [0,1,3,12]){state.goldCards=n;renderResultGoldCards();assert($('result-gold').parentElement===$('result-count').parentElement);assert($('result-gold').querySelectorAll('.result-gold-card').length===n);assert($('result-gold').hidden===(n===0));}
+  state.goldCards=before;renderResultGoldCards();
 });
 test('compact toolbar and no payment hints',()=>{assert(!document.querySelector('.brand'));assert(!document.querySelector('#trophies,.trophy'));assert(!$('tray-items').textContent.includes('お金をタップして、ここに。'));assert($('art').parentElement===document.querySelector('.product'));assert($('art').textContent===current.emoji);assert($('sound').closest('.score')&&$('help').closest('.score'));render();assert(!document.querySelector('#payment-hint,#coin-preview,#exp-preview,.checkout'));});
 async function testAsync(name, fn) {totalTests++;try {await fn(); out.textContent+='PASS '+name+'\n'; passed++;} catch(e) {out.textContent+='FAIL '+name+': '+e.message+'\n';}}
