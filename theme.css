@@ -1,13 +1,13 @@
 /* Illustrated shop skin. Layout and all hit targets remain real HTML controls. */
 :root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif}
-body{background:#bda185 url('assets/art/shop.jpg') center/cover fixed;color:#30271f}
+body{background:#bda185 url('assets/art/shop-stylized.png') center/cover fixed;color:#30271f}
 body::before{content:'';position:fixed;inset:0;background:#37271655;backdrop-filter:blur(12px);z-index:-1}
 .game{height:clamp(calc(650 * var(--u)),calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px),calc(720 * var(--u)));grid-template-rows:calc(32 * var(--u)) calc(44 * var(--u)) minmax(calc(180 * var(--u)),1fr) calc(156 * var(--u)) calc(230 * var(--u));border-radius:calc(18 * var(--u));background:#f3d3a3;box-shadow:0 16px 70px #25180a60;overflow:hidden}
 .game>header{background:#fffaf0;border-bottom:1px solid #dfd1bd;padding:0 calc(12 * var(--u))}
 .brand{font-size:calc(13 * var(--u));color:#294439}.brand span{display:none}.header-actions #sound{font-size:calc(10 * var(--u))}.header-actions button{width:calc(26 * var(--u));height:calc(26 * var(--u));background:#fffdf7}
 .collection{margin:0;padding:calc(3 * var(--u)) calc(13 * var(--u));border:0;background:#fffaf0;box-shadow:0 2px 4px #69543b30;z-index:1}
 .score{display:grid;grid-template-columns:auto 1fr;gap:0 calc(10 * var(--u));align-items:center;padding:0}.score>span{font-size:calc(10 * var(--u));font-weight:700}.score strong{font-size:calc(26 * var(--u));color:#111f18}.score small{grid-column:1/-1;font-size:calc(8 * var(--u));color:#776a57}.best{color:#776a57}.shelf-label{display:none}
-.product{position:relative;background:#dbb98b url('assets/art/shop.jpg') center 36%/cover no-repeat;padding:calc(10 * var(--u));align-items:flex-end;justify-content:center}
+.product{position:relative;background:#dbb98b url('assets/art/shop-stylized.png') center 36%/cover no-repeat;padding:calc(10 * var(--u));align-items:flex-end;justify-content:center}
 .product-content{position:relative;width:48%;height:auto;min-height:calc(105 * var(--u));max-height:100%;padding:calc(12 * var(--u)) calc(10 * var(--u));gap:calc(8 * var(--u));background:#fffefa;border-radius:42% 42% 38% 20%;box-shadow:0 4px 16px #684c2925;justify-content:center}
 .product-content::after{content:'';position:absolute;left:calc(-8 * var(--u));bottom:18%;width:calc(20 * var(--u));height:calc(18 * var(--u));background:#fffefa;clip-path:polygon(100% 0,100% 100%,0 100%)}
 .product .product-art{display:none}.product h1{font-size:calc(12 * var(--u));font-weight:800;line-height:1.5;overflow-wrap:anywhere}.product .price{font-size:calc(28 * var(--u));color:#063e2b;letter-spacing:-1px;white-space:nowrap}
@@ -48,9 +48,9 @@ body::before{content:'';position:fixed;inset:0;background:#37271655;backdrop-fil
 /* One continuous counter beneath scene, tray, and the wallet's rounded corners. */
 .game{--tray-height:calc(112 * var(--u));background:#dba452 url('assets/art/counter.jpg') center bottom/100% auto repeat-y;height:clamp(calc(700 * var(--u)),calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px),calc(760 * var(--u)));grid-template-rows:calc(32 * var(--u)) calc(44 * var(--u)) minmax(calc(180 * var(--u)),1fr) calc(204 * var(--u)) calc(230 * var(--u))}
 .product{background:transparent;isolation:isolate}
-.shop-scene{position:absolute;left:0;top:0;width:100%;height:113%;background:url('assets/art/shop.jpg') center top/100% 100% no-repeat;pointer-events:none;z-index:-1}
-.cashier-face{position:absolute;inset:0;background:url('assets/art/cashier-idle.jpg') center top/100% 100% no-repeat;mask-image:radial-gradient(ellipse 12% 15% at 29% 27%,#000 86%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 12% 15% at 29% 27%,#000 86%,transparent 100%)}
-.product[data-expression="smile"] .cashier-face{opacity:0}
+.shop-scene{position:absolute;left:0;top:0;width:100%;height:113%;background:url('assets/art/shop-stylized.png') center top/100% 100% no-repeat;pointer-events:none;z-index:-1}
+.cashier-face{opacity:0;position:absolute;inset:0;background:url('assets/art/cashier-stylized-smile.png') center top/100% 100% no-repeat;mask-image:radial-gradient(ellipse 13% 20% at 28% 34%,#000 86%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 13% 20% at 28% 34%,#000 86%,transparent 100%)}
+.product[data-expression="smile"] .cashier-face{opacity:1}
 .payment{background:none;box-shadow:none;padding-top:calc(8 * var(--u))}
 .tray{flex:0 0 auto;isolation:isolate}
 .tray::before{content:'';position:absolute;left:0;right:0;top:0;height:var(--tray-height);background:url('assets/art/tray.jpg') center/100% 100% no-repeat;clip-path:polygon(8% 6%,92% 6%,95% 8%,97% 16%,99% 73%,98% 81%,96% 87%,4% 87%,2% 82%,1% 74%,3% 17%,5% 9%);pointer-events:none;z-index:-1}
